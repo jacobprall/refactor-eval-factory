@@ -1,0 +1,161 @@
+name: Agentic workflow request
+description: Propose a new agent workflow for the factory to run.
+title: "[Workflow]: "
+labels: ["workflow-request"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the workflow you want, not how to build it. Triage reads this issue and the repository, and the spec writer turns both into a specification for you to approve. Answer the product decisions here so Triage doesn't have to ask.
+
+        When the request is ready, apply `factory:triage` to start Triage.
+
+  - type: textarea
+    id: outcome
+    attributes:
+      label: What should the workflow accomplish?
+      description: One or two sentences on the result and who it serves.
+      placeholder: When a pull request changes the public API, update the API reference docs so they never drift from the code.
+    validations:
+      required: true
+
+  - type: textarea
+    id: current-process
+    attributes:
+      label: What happens today?
+      description: The manual process this replaces, or what goes wrong without it.
+      placeholder: Reviewers ask authors to update docs by hand, and about half of API changes ship without them.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: trigger
+    attributes:
+      label: What starts the workflow?
+      options:
+        - A label applied to an issue
+        - A label applied to a pull request
+        - A comment command on an issue or pull request
+        - A push to the base branch
+        - A schedule
+        - Started manually with the Render CLI or API
+        - Not sure
+    validations:
+      required: true
+
+  - type: input
+    id: trigger-details
+    attributes:
+      label: Trigger details
+      description: The label name, command, branch, or schedule.
+      placeholder: "factory:docs label, or /factory docs, or weekdays at 09:00 UTC"
+    validations:
+      required: false
+
+  - type: textarea
+    id: inputs
+    attributes:
+      label: What should the agent read?
+      description: The context it needs to do the job. Note anything outside the issue, pull request, and repository.
+      placeholder: |
+        - The pull request diff
+        - Files under docs/api/
+        - The OpenAPI spec at api/openapi.yaml
+    validations:
+      required: false
+
+  - type: textarea
+    id: behavior
+    attributes:
+      label: What should it do?
+      description: The steps a person doing this job by hand would take, in order.
+      placeholder: |
+        1. Find public API changes in the diff.
+        2. Update the matching reference pages.
+        3. Run the docs build.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: outputs
+    attributes:
+      label: Where should the results go?
+      description: Select every output. The factory never approves or merges pull requests.
+      options:
+        - label: A comment on the issue or pull request
+        - label: A specification a person approves
+        - label: Labels added or removed
+        - label: A draft pull request with code changes
+        - label: A COMMENT review on a pull request
+        - label: A new issue
+        - label: Workflows logs only, with no GitHub writes
+
+  - type: dropdown
+    id: approval
+    attributes:
+      label: When should a person approve?
+      options:
+        - Before each stage, with a label per stage (like Triage, then Spec-to-PR)
+        - Once up front, then it runs to the end (like factory:autopilot)
+        - Never; the trigger alone starts all of it
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: example
+    attributes:
+      label: Walk through one example
+      description: A real or realistic input, and exactly what the workflow should produce from it.
+      placeholder: |
+        Input: PR #142 renames the `limit` query parameter on GET /users to `pageSize`.
+        Result: a draft PR on the same repository that updates docs/api/users.md, with the docs build passing.
+    validations:
+      required: true
+
+  - type: textarea
+    id: success
+    attributes:
+      label: How will you know it works?
+      description: One observable behavior per line. Each line becomes a candidate acceptance criterion.
+      placeholder: |
+        - A PR that changes no public API gets no docs PR.
+        - The docs PR passes the docs build.
+        - The docs PR links to the source PR.
+    validations:
+      required: true
+
+  - type: textarea
+    id: stop-conditions
+    attributes:
+      label: When should it stop, ask, or do nothing?
+      description: Inputs it should skip, questions it should ask a person, and failures it should report instead of working around.
+      placeholder: Skip draft PRs. If a change touches more than 20 endpoints, comment and stop instead of opening a PR.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: new-capabilities
+    attributes:
+      label: Does it need any of these?
+      description: Each one changes the factory's setup or authority boundary, so flag it early.
+      options:
+        - label: A new secret or API key
+        - label: A new GitHub App permission or webhook event
+        - label: Persistent storage, such as a database
+        - label: Access to a service outside GitHub and the model provider
+        - label: Changes to files under .github/workflows/
+        - label: Approving or merging pull requests
+
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Constraints
+      description: Repositories, verification commands, model preference, cost or time budget, and expected volume.
+      placeholder: |
+        - Repositories: acme/web only
+        - Verification: npm run docs:build
+        - Budget: under $2 and 15 minutes per run
+        - Volume: about 10 runs a week
+    validations:
+      required: false
