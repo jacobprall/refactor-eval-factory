@@ -35,10 +35,10 @@ export function defineFactoryConfig(config: FactoryConfig): FactoryConfig {
 
 export default defineFactoryConfig({
 	repos: {
-		"render-examples/render-factory-example-target": {
+		"render-lab/software-factory": {
 			baseBranch: "main",
 			install: "npm ci",
-			verify: ["npm run build", "npm test"],
+			verify: ["npm run check"],
 		},
 	},
 	labels: {
