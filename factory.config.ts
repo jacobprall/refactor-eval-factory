@@ -35,7 +35,7 @@ export function defineFactoryConfig(config: FactoryConfig): FactoryConfig {
 
 export default defineFactoryConfig({
 	repos: {
-		"jacobprall/sw-factory": {
+		"jacobprall/software-factory": {
 			baseBranch: "main",
 			install: "npm ci",
 			verify: ["npm run check"],
