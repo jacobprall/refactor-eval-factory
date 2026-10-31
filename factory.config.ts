@@ -40,6 +40,23 @@ export default defineFactoryConfig({
 			install: "npm ci",
 			verify: ["npm run check"],
 		},
+		"jacobprall/render-mcp-server": {
+			baseBranch: "main",
+			// The sandbox image has no Go, and the runner can't write outside HOME, so the go.mod
+			// toolchain is unpacked into HOME (kept in the snapshot) and verify calls it from there.
+			install: [
+				`v=$(awk '$1 == "go" { print $2 }' go.mod)`,
+				`arch=$(node -p '({ x64: "amd64", arm64: "arm64" })[process.arch]')`,
+				`sdk="$HOME/sdk/go$v"`,
+				`if [ ! -x "$sdk/bin/go" ]; then mkdir -p "$sdk" && node -e 'fetch(process.argv[1]).then((r) => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); }).then((b) => process.stdout.write(Buffer.from(b)))' "https://go.dev/dl/go$v.linux-$arch.tar.gz" | tar -xz --strip-components=1 -C "$sdk"; fi`,
+				`ln -sfn "$sdk" "$HOME/sdk/go"`,
+				`GOTOOLCHAIN=local "$HOME/sdk/go/bin/go" mod download`,
+			].join(" && "),
+			verify: [
+				`export PATH="$HOME/sdk/go/bin:$PATH" GOTOOLCHAIN=local && go build ./...`,
+				`export PATH="$HOME/sdk/go/bin:$PATH" GOTOOLCHAIN=local && go test $(go list ./... | grep -v e2e)`,
+			],
+		},
 	},
 	labels: {
 		triage: "factory:triage",
