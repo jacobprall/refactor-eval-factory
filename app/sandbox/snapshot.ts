@@ -332,7 +332,7 @@ async function createSnapshot(client: SandboxClient, sandboxId: string, name: st
 		if (Date.now() > until) throw new Error(`snapshot ${snap.id} still creating after ${client.t.snapshotTimeoutMs}ms`);
 		await sleep(client.t.pollMs);
 		const { id, sandboxGroupId } = snap;
-		snap = await client.call(() => client.api.snapshots.get({ sandboxGroupId, snapshotId: id }), { retryOn: TRANSIENT });
+		snap = await client.call(() => client.api.snapshots.get({ sandboxGroupId, snapshotId: id }), { retryOn: TRANSIENT, idempotent: true });
 	}
 	if (snap.status !== "available") throw new Error(`snapshot ${snap.id} ${snap.status}: ${snap.error ?? "no error given"}`);
 	return snap;

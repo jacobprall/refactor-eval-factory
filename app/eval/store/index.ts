@@ -24,7 +24,13 @@ const trajectoryKey = (input: RunTrajectoryInput): [string, string, string, numb
 	input.scenarioId,
 	input.replicate,
 ];
-const errorText = (error: unknown) => (error instanceof Error ? (error.stack ?? error.message) : String(error)).slice(0, 20_000);
+const describeError = (error: unknown): string => (error instanceof Error ? (error.stack ?? error.message) : String(error));
+/** Network failures say only "fetch failed"; the cause names the actual problem (a reset, a timeout, DNS). */
+const errorText = (error: unknown) =>
+	(error instanceof Error && error.cause !== undefined
+		? `${describeError(error)}\ncaused by: ${describeError(error.cause)}`
+		: describeError(error)
+	).slice(0, 20_000);
 
 export interface ScenarioSummary {
 	targetId: string;

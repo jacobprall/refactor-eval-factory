@@ -41,6 +41,14 @@ export const TRANSIENT = [429, 503];
  * briefly after it reports `running`), so readiness checks treat 404 as "not yet".
  */
 const READY_RETRY = [404, ...TRANSIENT];
+/** Many concurrent tasks share one workspace's request limit, so congestion gets more attempts and growing, jittered waits. */
+const CONGESTED_ATTEMPTS = 8;
+const MAX_BACKOFF_MS = 30_000;
+
+/** A request that never got an HTTP response: DNS, connect, TLS, or a dropped socket. */
+function isNetworkError(err: unknown): boolean {
+	return err instanceof TypeError && err.message === "fetch failed";
+}
 
 export interface ClientExecOptions {
 	timeoutMs: number;
@@ -66,8 +74,14 @@ export class SandboxClient {
 		this.t = { ...DEFAULT_TIMINGS, ...timings };
 	}
 
-	/** Paces every API call and retries the given statuses (429 by default, which is never processed server-side). */
-	async call<T>(fn: () => Promise<T>, opts: { retryOn?: readonly number[]; attempts?: number; signal?: AbortSignal } = {}): Promise<T> {
+	/**
+	 * Paces every API call and retries the given statuses (429 by default, which is never processed server-side).
+	 * `idempotent` calls also retry network failures, since repeating them is harmless; creates and execs are not.
+	 */
+	async call<T>(
+		fn: () => Promise<T>,
+		opts: { retryOn?: readonly number[]; attempts?: number; signal?: AbortSignal; idempotent?: boolean } = {},
+	): Promise<T> {
 		const retryOn = opts.retryOn ?? [429];
 		const attempts = opts.attempts ?? 5;
 		for (let attempt = 1; ; attempt++) {
@@ -79,8 +93,12 @@ export class SandboxClient {
 				return await fn();
 			} catch (err) {
 				const status = err instanceof ClientError || err instanceof ServerError ? err.statusCode : undefined;
-				if (attempt >= attempts || status === undefined || !retryOn.includes(status) || opts.signal?.aborted) throw err;
-				await sleep(this.t.pollMs, undefined, { signal: opts.signal });
+				const network = opts.idempotent === true && isNetworkError(err);
+				if (opts.signal?.aborted || !(network || (status !== undefined && retryOn.includes(status)))) throw err;
+				const congested = network || (status !== undefined && TRANSIENT.includes(status));
+				if (attempt >= (congested ? Math.max(attempts, CONGESTED_ATTEMPTS) : attempts)) throw err;
+				const wait = congested ? Math.min(this.t.pollMs * 2 ** (attempt - 1), MAX_BACKOFF_MS) * (0.5 + Math.random() / 2) : this.t.pollMs;
+				await sleep(wait, undefined, { signal: opts.signal });
 			}
 		}
 	}
@@ -122,18 +140,18 @@ export class SandboxClient {
 		data: string | Buffer,
 		opts: { contentType?: SandboxUploadContentType; signal?: AbortSignal } = {},
 	): Promise<void> {
-		await this.call(() => this.api.upload(id, path, data, undefined, opts), { retryOn: TRANSIENT, signal: opts.signal });
+		await this.call(() => this.api.upload(id, path, data, undefined, opts), { retryOn: TRANSIENT, signal: opts.signal, idempotent: true });
 	}
 
 	async download(id: string, path: string, signal?: AbortSignal): Promise<Buffer> {
-		const file = await this.call(() => this.api.download(id, path, undefined, signal), { retryOn: TRANSIENT, signal });
+		const file = await this.call(() => this.api.download(id, path, undefined, signal), { retryOn: TRANSIENT, signal, idempotent: true });
 		return file.data;
 	}
 
 	async waitRunning(id: string): Promise<void> {
 		const until = Date.now() + this.t.bootTimeoutMs;
 		for (;;) {
-			const { status } = await this.call(() => this.api.get(id), { retryOn: READY_RETRY });
+			const { status } = await this.call(() => this.api.get(id), { retryOn: READY_RETRY, idempotent: true });
 			if (status === "running") return;
 			if (status === "errored" || status === "terminated") throw new Error(`sandbox ${id} is ${status}`);
 			if (Date.now() > until) throw new Error(`sandbox ${id} still ${status} after ${this.t.bootTimeoutMs}ms`);
@@ -144,7 +162,7 @@ export class SandboxClient {
 	/** Idempotent: a sandbox that no longer exists counts as terminated. */
 	async terminate(id: string): Promise<void> {
 		try {
-			await this.call(() => this.api.terminate(id), { retryOn: TRANSIENT });
+			await this.call(() => this.api.terminate(id), { retryOn: TRANSIENT, idempotent: true });
 		} catch (err) {
 			if (err instanceof ClientError && err.statusCode === 404) return;
 			throw err;

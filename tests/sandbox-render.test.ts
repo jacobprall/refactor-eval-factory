@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
-import { SandboxSnapshotNotFoundError } from "@renderinc/sdk";
+import { ClientError, SandboxSnapshotNotFoundError } from "@renderinc/sdk";
 import type { SandboxExecEvent } from "@renderinc/sdk/experimental";
 import { list as listTar } from "tar";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -430,5 +430,46 @@ describe("openEvalSandbox", () => {
 		await openEvalSandbox({ client: client(), buildSnapshot: build });
 		expect(build).toHaveBeenCalledTimes(1);
 		expect(fake.inputs("create")).toHaveLength(1);
+	});
+});
+
+describe("SandboxClient retries", () => {
+	const fetchFailed = () => Object.assign(new TypeError("fetch failed"), { cause: new Error("ECONNRESET") });
+	const failing = (failures: unknown[]) => {
+		const calls: string[] = [];
+		const next = (op: string) => {
+			calls.push(op);
+			const failure = failures.shift();
+			if (failure) throw failure;
+		};
+		const api = {
+			upload: async () => next("upload"),
+			exec: async () => {
+				next("exec");
+				return (async function* () {
+					yield { type: "exit", exit_code: 0 };
+				})();
+			},
+		} as unknown as SandboxApi;
+		return { calls, client: new SandboxClient(api, { minRequestIntervalMs: 0, pollMs: 0 }) };
+	};
+
+	it("retries a dropped connection only for calls that are safe to repeat", async () => {
+		const upload = failing([fetchFailed(), fetchFailed()]);
+		await upload.client.upload("sbx", "/tmp/file", "data");
+		expect(upload.calls).toEqual(["upload", "upload", "upload"]);
+
+		const exec = failing([fetchFailed()]);
+		await expect(exec.client.exec("sbx", "git commit", { timeoutMs: 1_000 })).rejects.toThrow("fetch failed");
+		expect(exec.calls).toEqual(["exec"]);
+	});
+
+	it("keeps retrying a congested workspace longer than other errors, then gives up", async () => {
+		const congested = failing(Array.from({ length: 7 }, () => new ClientError("rate limited", 429)));
+		await congested.client.exec("sbx", "true", { timeoutMs: 1_000 });
+		expect(congested.calls).toHaveLength(8);
+
+		const exhausted = failing(Array.from({ length: 8 }, () => new ClientError("rate limited", 429)));
+		await expect(exhausted.client.exec("sbx", "true", { timeoutMs: 1_000 })).rejects.toThrow("rate limited");
 	});
 });
