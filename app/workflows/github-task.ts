@@ -1,4 +1,4 @@
-import { type TaskContext, type TaskDefinition, task as registerTask } from "@renderinc/sdk/workflows";
+import { task as registerTask, type TaskContext, type TaskDefinition } from "@renderinc/sdk/workflows";
 import type { z } from "zod";
 import { type Claim, type Outcome, type RunControl, type Subject, type TaskResult, withClaim } from "../claims/index.js";
 import { requireRepo } from "../config/index.js";

@@ -100,4 +100,11 @@ describe("runAgent in a sandbox", () => {
 			},
 		});
 	});
+
+	it("passes an isolated evaluation working directory to the runner", async () => {
+		const sandbox = new FakeSandbox({ jsonl: `${cannedRun({ verdict: "ok", findings: [] })}\n` });
+		await runAgent(reviewer, "Review it.", { traceId: "trace-eval", sandbox, cwd: "/opt/factory/scratch/eval-worktree" });
+		const input = RunnerInput.parse(JSON.parse(sandbox.uploads.get(`${sandbox.runDir}/input.json`) as string));
+		expect(input.cwd).toBe("/opt/factory/scratch/eval-worktree");
+	});
 });

@@ -5,8 +5,8 @@ import type { Agent } from "../agents/define.js";
 import { AGENTS } from "../agents/registry.js";
 import { createEmitter, errorMessage } from "./core/emit.js";
 import { parseInput } from "./core/input.js";
-import { scrubKeys } from "./core/keys.js";
 import { executeHarness } from "./core/kernel.js";
+import { scrubKeys } from "./core/keys.js";
 import { PROTOCOL_VERSION, RUNNER_EXIT } from "./core/protocol.js";
 
 interface MainIO {

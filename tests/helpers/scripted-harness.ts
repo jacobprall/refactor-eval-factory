@@ -1,5 +1,5 @@
-import type { DriverContext } from "../../app/runner/core/driver.js";
 import type { Harness } from "../../app/harness/types.js";
+import type { DriverContext } from "../../app/runner/core/driver.js";
 
 /** One scripted model turn: optional text, then tool calls in order. A turn without calls ends the conversation. */
 export interface TestTurn {

@@ -2,11 +2,11 @@ import type { TaskDefinition } from "@renderinc/sdk/workflows";
 import type { Claim, Outcome, TaskResult } from "../../claims/index.js";
 import { config, TASKS } from "../../config/index.js";
 import { AutopilotInput, type PrReviewInput, type SpecToPrInput, type TriageInput } from "../../schemas/index.js";
+import { defineGitHubTask, type GitHubTaskContext, type GitHubTaskDeps } from "../github-task.js";
 import { prReviewWorkflow } from "../pr-review/index.js";
 import { type SpecToPrHandoff, specToPrWorkflow } from "../spec-to-pr/index.js";
 import { triageWorkflow } from "../triage/index.js";
 import type { TriageHandoff } from "../triage/spec.js";
-import { defineGitHubTask, type GitHubTaskContext, type GitHubTaskDeps } from "../github-task.js";
 
 const TIMEOUT_SECONDS = 8 * 60 * 60;
 

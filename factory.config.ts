@@ -35,7 +35,7 @@ export function defineFactoryConfig(config: FactoryConfig): FactoryConfig {
 
 export default defineFactoryConfig({
 	repos: {
-		"jacobprall/software-factory": {
+		"jacobprall/refactor-eval-factory": {
 			baseBranch: "main",
 			install: "npm ci",
 			verify: ["npm run check"],

@@ -6,7 +6,17 @@ import type { SandboxExecEvent } from "@renderinc/sdk/experimental";
 import { list as listTar } from "tar";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { config, type RepoContext } from "../app/config/index.js";
-import { buildSnapshot, type OpenSandboxDeps, openSandbox, type SandboxApi, SandboxClient, type SnapshotManifest } from "../app/sandbox/index.js";
+import {
+	buildEvalSnapshot,
+	buildSnapshot,
+	EVAL_SNAPSHOT_NAME,
+	type OpenSandboxDeps,
+	openEvalSandbox,
+	openSandbox,
+	type SandboxApi,
+	SandboxClient,
+	type SnapshotManifest,
+} from "../app/sandbox/index.js";
 import { runnerPayload } from "../app/sandbox/snapshot.js";
 
 /** The files in a gzipped tar, by path. */
@@ -285,6 +295,16 @@ describe("buildSnapshot", () => {
 	});
 });
 
+describe("buildEvalSnapshot", () => {
+	it("builds a reusable runner snapshot without staging repository credentials", async () => {
+		const built = await buildEvalSnapshot(client());
+		expect(built.name).toBe(EVAL_SNAPSHOT_NAME);
+		expect(fake.inputs("snapshot.create")).toEqual([{ sandboxId: "sbx-1", kind: "filesystem", name: EVAL_SNAPSHOT_NAME }]);
+		expect(fake.calls.some((call) => call.op === "upload" && call.path.endsWith("/github.com"))).toBe(false);
+		expect(fake.commands().some((command) => command.includes("git init --quiet"))).toBe(true);
+	});
+});
+
 describe("openSandbox", () => {
 	const deps = (extra: Partial<OpenSandboxDeps> = {}): OpenSandboxDeps => ({ client: client(), readToken, ...extra });
 
@@ -386,5 +406,29 @@ describe("openSandbox", () => {
 		fake.overrides = (_id, command) => (command.includes("verify.sh") ? [out(info({ runnerNonDumpable: false })), exit(0)] : []);
 		await expect(openSandbox(repo(), { kind: "branch", name: "main" }, deps())).rejects.toThrow("non-dumpable");
 		expect(fake.calls.at(-1)).toEqual({ op: "terminate", id: "sbx-1" });
+	});
+});
+
+describe("openEvalSandbox", () => {
+	it("restores the generic runner snapshot without fetching a repository", async () => {
+		const sandbox = await openEvalSandbox({ client: client() });
+		expect(sandbox.id).toBe("sbx-1");
+		expect(fake.inputs("create")).toEqual([
+			{ snapshotName: EVAL_SNAPSHOT_NAME, networkPolicy: { type: "allow-all" }, timeoutSeconds: config.sandbox.timeoutSeconds },
+		]);
+		expect(fake.commands().some((command) => command.includes("'fetch'"))).toBe(false);
+		expect(fake.calls.some((call) => call.op === "upload" && call.path.endsWith("/github.com"))).toBe(false);
+	});
+
+	it("builds the generic snapshot once when it is missing", async () => {
+		let missing = true;
+		fake.createError = (input) => (input?.snapshotName && missing ? new SandboxSnapshotNotFoundError("not found", 404) : undefined);
+		const build = vi.fn(async () => {
+			missing = false;
+			return { id: "snp-new", sandboxGroupId: "sbg-1", name: EVAL_SNAPSHOT_NAME, manifest: fake.manifest };
+		});
+		await openEvalSandbox({ client: client(), buildSnapshot: build });
+		expect(build).toHaveBeenCalledTimes(1);
+		expect(fake.inputs("create")).toHaveLength(1);
 	});
 });

@@ -1,6 +1,6 @@
 import type { RepoContext } from "../../config/index.js";
-import type { Implementation, Spec } from "../../schemas/index.js";
 import { renderSpecSections, verbatimCodeSpan } from "../../format/index.js";
+import type { Implementation, Spec } from "../../schemas/index.js";
 import type { VerifyRun } from "../run-verify.js";
 import { failureReport } from "./verify.js";
 

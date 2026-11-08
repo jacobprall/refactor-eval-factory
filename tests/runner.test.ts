@@ -46,6 +46,21 @@ describe("bundled runner (runner.mjs)", { timeout: 60_000 }, () => {
 			{ id: "spec-writer", harness: "pi", label: "anthropic/claude-opus-5" },
 			{ id: "implementer", harness: "pi", label: "anthropic/claude-opus-5" },
 			{ id: "pr-reviewer", harness: "pi", label: "anthropic/claude-sonnet-5" },
+			{ id: "eval-baseline", harness: "pi", label: "anthropic/claude-sonnet-5" },
+			{ id: "eval-quality-guidance", harness: "pi", label: "anthropic/claude-sonnet-5" },
+			{ id: "eval-refactoring-knowledge", harness: "pi", label: "anthropic/claude-sonnet-5" },
+			{ id: "eval-change-locality", harness: "pi", label: "anthropic/claude-sonnet-5" },
+			{ id: "eval-change-locality-skill", harness: "pi", label: "anthropic/claude-sonnet-5" },
+			{ id: "eval-refactor-after", harness: "pi", label: "anthropic/claude-sonnet-5" },
+			{ id: "eval-playbook-implementer", harness: "pi", label: "anthropic/claude-sonnet-5" },
+			{ id: "eval-post-refactor", harness: "pi", label: "anthropic/claude-sonnet-5" },
+			{ id: "eval-post-refactor-briefed", harness: "pi", label: "anthropic/claude-sonnet-5" },
+			{ id: "eval-post-refactor-playbook", harness: "pi", label: "anthropic/claude-sonnet-5" },
+			{ id: "eval-post-refactor-signals", harness: "pi", label: "anthropic/claude-sonnet-5" },
+			{ id: "eval-pre-refactor", harness: "pi", label: "anthropic/claude-sonnet-5" },
+			{ id: "eval-trace-author", harness: "pi", label: "anthropic/claude-sonnet-5" },
+			{ id: "eval-skill-reviewer", harness: "pi", label: "anthropic/claude-sonnet-5" },
+			{ id: "eval-skill-applier", harness: "pi", label: "anthropic/claude-sonnet-5" },
 		]);
 		expect(code).toBe(0);
 	});

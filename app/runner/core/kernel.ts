@@ -145,7 +145,8 @@ export async function executeHarness(run: HarnessRun, harness: HarnessRuntime): 
 		stop.abort();
 	}
 
-	const final: Outcome = outcome ??
+	const final: Outcome =
+		outcome ??
 		(failure
 			? { type: "error", code: "agent_error", message: errorMessage(failure.error) }
 			: { type: "error", code: "no_submission", message: `the model stopped without calling ${SUBMIT_TOOL}` });

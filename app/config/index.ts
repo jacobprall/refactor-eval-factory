@@ -43,5 +43,8 @@ export const TASKS = {
 	autopilot: "autopilot",
 	cancel: "cancel",
 	refreshSnapshot: "refresh-snapshot",
+	runExperiment: "eval-run-experiment",
+	runTrajectory: "eval-run-trajectory",
+	summarizeExperiment: "eval-summarize-experiment",
 } as const;
 export type TaskName = (typeof TASKS)[keyof typeof TASKS];

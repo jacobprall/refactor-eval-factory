@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { AGENTS, implementer, prReviewer, specWriter, triage } from "../app/agents/index.js";
+import { AGENTS, EVAL_AGENTS, EVAL_INTERVENTION_AGENTS, implementer, prReviewer, specWriter, triage } from "../app/agents/index.js";
 import { bundleInputs } from "../app/runner/bundle.js";
 
-const agents = [triage, specWriter, implementer, prReviewer];
+const agents = [triage, specWriter, implementer, prReviewer, ...EVAL_AGENTS, ...EVAL_INTERVENTION_AGENTS];
 
 describe("agent registry", () => {
 	it("bundles every built-in agent, each with a non-empty prompt", () => {
@@ -27,9 +27,9 @@ describe("agent authority", () => {
 		expect(new Set(agents.map((agent) => agent.promptPath)).size).toBe(ids.length);
 	});
 
-	it("gives only the implementer write tools and runs every agent in a sandbox", () => {
+	it("gives write tools only to implementation agents and runs every agent in a sandbox", () => {
 		const writers = agents.filter((agent) => agent.tools.some((tool) => tool === "edit" || tool === "write")).map((agent) => agent.id);
-		expect(writers).toEqual(["implementer"]);
+		expect(writers).toEqual(["implementer", ...[...EVAL_AGENTS, ...EVAL_INTERVENTION_AGENTS].map((agent) => agent.id)]);
 		expect(agents.every((agent) => agent.tools.length > 0)).toBe(true);
 	});
 

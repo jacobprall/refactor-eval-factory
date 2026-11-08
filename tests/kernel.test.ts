@@ -139,7 +139,10 @@ describe("kernel", { timeout: 15_000 }, () => {
 	});
 
 	it("times out a driver that is still opening, without starting", async () => {
-		const { code, events } = await execute({ open: (ctx) => aborted(ctx).then(() => ({ version: "1", model: "m", run: async () => {} })) }, makeInput(undefined, { timeout_ms: 1000 }));
+		const { code, events } = await execute(
+			{ open: (ctx) => aborted(ctx).then(() => ({ version: "1", model: "m", run: async () => {} })) },
+			makeInput(undefined, { timeout_ms: 1000 }),
+		);
 		expect(events).toEqual([expect.objectContaining({ type: "error", code: "timeout" })]);
 		expect(code).toBe(3);
 	});
@@ -156,7 +159,11 @@ describe("kernel", { timeout: 15_000 }, () => {
 		);
 		expect(terminal(mid.events)).toMatchObject({ type: "error", code: "agent_error", message: "the run was cancelled" });
 
-		const before = await execute(driver(async () => {}), makeInput(undefined), AbortSignal.abort());
+		const before = await execute(
+			driver(async () => {}),
+			makeInput(undefined),
+			AbortSignal.abort(),
+		);
 		expect(before.events).toEqual([expect.objectContaining({ type: "error", code: "agent_error", message: "the run was cancelled" })]);
 	});
 

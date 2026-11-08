@@ -1,6 +1,6 @@
-import type { Review } from "../../schemas/index.js";
 import { type RenderReviewOptions, renderReview } from "../../format/index.js";
-import { type GitHubClient, GitHubError, parseMarker, type PullRequestReview, renderMarker } from "../../github/index.js";
+import { type GitHubClient, GitHubError, type PullRequestReview, parseMarker, renderMarker } from "../../github/index.js";
+import type { Review } from "../../schemas/index.js";
 
 type ReviewGitHub = Pick<GitHubClient, "botLogin" | "listReviews" | "createReview">;
 

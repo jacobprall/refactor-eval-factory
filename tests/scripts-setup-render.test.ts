@@ -85,9 +85,9 @@ describe("setup:render", () => {
 
 		const byName = Object.fromEntries(world.groups.map((g) => [g.name, Object.fromEntries(g.envVars.map((v) => [v.key, v.value]))]));
 		expect(byName).toEqual({
-			"software-factory-shared": { RENDER_API_KEY: SECRETS.RENDER_API_KEY },
-			"software-factory-gateway": { GITHUB_WEBHOOK_SECRET: SECRETS.GITHUB_WEBHOOK_SECRET },
-			"software-factory-workflows": {
+			"refactor-eval-shared": { RENDER_API_KEY: SECRETS.RENDER_API_KEY },
+			"refactor-eval-gateway": { GITHUB_WEBHOOK_SECRET: SECRETS.GITHUB_WEBHOOK_SECRET },
+			"refactor-eval-workflows": {
 				RENDER_WORKSPACE_ID: WORKSPACE,
 				GITHUB_APP_ID: "1",
 				GITHUB_APP_PRIVATE_KEY: SECRETS.GITHUB_APP_PRIVATE_KEY,
@@ -110,11 +110,11 @@ describe("setup:render", () => {
 	it("updates only changed keys and leaves keys it doesn't manage alone", async () => {
 		const world = renderWorld({
 			groups: [
-				{ id: "evg-a", name: "software-factory-shared", ownerId: WORKSPACE, envVars: [{ key: "RENDER_API_KEY", value: SECRETS.RENDER_API_KEY }] },
-				{ id: "evg-b", name: "software-factory-gateway", ownerId: WORKSPACE, envVars: [{ key: "GITHUB_WEBHOOK_SECRET", value: "old" }] },
+				{ id: "evg-a", name: "refactor-eval-shared", ownerId: WORKSPACE, envVars: [{ key: "RENDER_API_KEY", value: SECRETS.RENDER_API_KEY }] },
+				{ id: "evg-b", name: "refactor-eval-gateway", ownerId: WORKSPACE, envVars: [{ key: "GITHUB_WEBHOOK_SECRET", value: "old" }] },
 				{
 					id: "evg-c",
-					name: "software-factory-workflows",
+					name: "refactor-eval-workflows",
 					ownerId: WORKSPACE,
 					envVars: [{ key: "GITHUB_API_URL", value: "https://ghe.example.com/api/v3" }],
 				},
@@ -137,12 +137,17 @@ describe("setup:render", () => {
 	});
 
 	it("refuses to pick between two groups with the same name", async () => {
-		const duplicate = { name: "software-factory-gateway", ownerId: WORKSPACE, envVars: [] };
-		const world = renderWorld({ groups: [{ ...duplicate, id: "evg-1" }, { ...duplicate, id: "evg-2" }] });
+		const duplicate = { name: "refactor-eval-gateway", ownerId: WORKSPACE, envVars: [] };
+		const world = renderWorld({
+			groups: [
+				{ ...duplicate, id: "evg-1" },
+				{ ...duplicate, id: "evg-2" },
+			],
+		});
 		const { code, output } = await run(world);
 		expect(code).toBe(1);
-		expect(output).toContain("2 env groups are named software-factory-gateway");
-		expect(world.groups.filter((g) => g.name === "software-factory-gateway")).toHaveLength(2);
+		expect(output).toContain("2 env groups are named refactor-eval-gateway");
+		expect(world.groups.filter((g) => g.name === "refactor-eval-gateway")).toHaveLength(2);
 		expect(writes(world.calls).filter((c) => /evg-[12]/.test(c.path))).toEqual([]);
 	});
 
@@ -166,12 +171,10 @@ describe("render.yaml env groups", () => {
 		return [...block.matchAll(/fromGroup:\s*(\S+)/g)].map((m) => m[1] ?? "");
 	}
 
-	it("links each service to the groups setup:render creates for it, covering SERVICE_ENV", () => {
-		for (const service of ["gateway", "workflows"] as const) {
-			const expected = ENV_GROUPS.filter((g) => g.services.includes(service));
-			expect(linkedGroups(`factory-${service}`).sort()).toEqual(expected.map((g) => g.name).sort());
-			const keys = [...expected.flatMap((g) => g.keys), "RENDER_WORKFLOW_SLUG"];
-			expect(keys.filter((k) => SERVICE_ENV[service].includes(k)).sort()).toEqual([...SERVICE_ENV[service]].sort());
-		}
+	it("links the deployed workflow to the groups setup:render creates for it", () => {
+		const expected = ENV_GROUPS.filter((group) => group.services.includes("workflows"));
+		expect(linkedGroups("refactor-eval-workflows").sort()).toEqual(expected.map((group) => group.name).sort());
+		const keys = expected.flatMap((group) => group.keys);
+		expect(keys.filter((key) => SERVICE_ENV.workflows.includes(key)).sort()).toEqual([...SERVICE_ENV.workflows].sort());
 	});
 });

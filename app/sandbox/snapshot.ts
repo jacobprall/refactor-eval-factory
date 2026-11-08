@@ -57,6 +57,8 @@ export interface BuiltSnapshot {
 	manifest: SnapshotManifest;
 }
 
+export const EVAL_SNAPSHOT_NAME = "refactor-eval-runner";
+
 export function readToken(repo: RepoContext): Promise<string> {
 	return githubToken({ installationId: repo.installationId, repo: repo.name, permissions: { contents: "read" } });
 }
@@ -164,6 +166,75 @@ export async function buildSnapshot(client: SandboxClient, repo: RepoContext, sh
 		await pruneSnapshots(client, snap.sandboxGroupId, name, KEEP_SNAPSHOTS);
 		log("info", "snapshot build finished", { repo: repo.fullName, sha, snapshot: name, id: snap.id, ms: Date.now() - started });
 		return { id: snap.id, sandboxGroupId: snap.sandboxGroupId, name, manifest };
+	} finally {
+		await client.terminateQuietly(id);
+	}
+}
+
+/**
+ * Builds the repository-free snapshot used by local and deployed evaluation tasks.
+ * It contains only the hardened runner, tools, scratch space, and an inert git checkout
+ * required by the shared sandbox verification script. Target seeds are uploaded later.
+ */
+export async function buildEvalSnapshot(client: SandboxClient): Promise<BuiltSnapshot> {
+	const t = client.t;
+	const prepare = { timeoutMs: t.prepareTimeoutMs };
+	const boot = { timeoutMs: t.bootTimeoutMs };
+	const started = Date.now();
+	log("info", "evaluation snapshot build started", { snapshot: EVAL_SNAPSHOT_NAME });
+
+	const { id } = await client.call(() => client.api.create({ timeoutSeconds: BUILDER_TIMEOUT_SECONDS, networkPolicy: ALLOW_ALL_EGRESS }));
+	try {
+		await client.waitRunning(id);
+		await client.check(id, `mkdir -p -m 700 ${STAGING_DIR}`, { ...boot, waitReady: true });
+		const payload = await runnerPayload();
+		await client.upload(id, `${STAGING_DIR}/stage.tgz`, await stagingArchive(payload));
+		await client.check(id, `tar -xzf ${STAGING_DIR}/stage.tgz -C ${STAGING_DIR} && rm ${STAGING_DIR}/stage.tgz`, boot);
+		await client.check(
+			id,
+			`mkdir -p ${APP_DIR}/runner ${APP_DIR}/build ${REPO_DIR} ${SCRATCH_DIR}` +
+				` && cp ${STAGING_DIR}/*.sh ${APP_DIR}/ && cp ${STAGING_DIR}/build/*.sh ${APP_DIR}/build/` +
+				` && cp -R ${STAGING_DIR}/runner/. ${APP_DIR}/runner/`,
+			boot,
+		);
+		await client.check(id, `bash ${APP_DIR}/install-tools.sh`, prepare);
+		const node = await nodePath(client, id);
+		await client.check(id, createRunnerUserCommand(), boot);
+		await client.upload(id, `${APP_DIR}/env`, envFileContent(node));
+		await client.upload(id, `${APP_DIR}/gitconfig`, SANDBOX_GITCONFIG);
+		await client.check(
+			id,
+			[
+				`chmod 755 ${SANDBOX_ROOT}`,
+				`chmod -R a+rX,go-w ${APP_DIR}`,
+				`chown -R ${RUN_AS}: ${REPO_DIR} ${SCRATCH_DIR}`,
+				`chmod 700 ${SCRATCH_DIR}`,
+				`timeout 120 ${asRunner(node, `${APP_DIR}/runner/runner.mjs`, "--self-test")}`,
+				asRunner(
+					"bash",
+					"-c",
+					"git init --quiet && git config user.name eval-factory && git config user.email eval@localhost && touch .eval-bootstrap && git add . && git commit --quiet -m bootstrap",
+				),
+			].join(" && "),
+			prepare,
+		);
+		const sha = (await client.check(id, asRunner("git", "rev-parse", "HEAD"), prepare)).trim();
+		const manifest: SnapshotManifest = {
+			repo: "local/refactor-eval",
+			baseBranch: "main",
+			sha,
+			lockfileHash: sha256(""),
+			install: null,
+			createdAt: new Date().toISOString(),
+		};
+		await client.upload(id, `${APP_DIR}/manifest.json`, JSON.stringify(manifest, null, 2));
+		await client.check(id, lockdownCommand(node), prepare);
+		await verifySandbox(client, id);
+
+		const snap = await createSnapshot(client, id, EVAL_SNAPSHOT_NAME);
+		await pruneSnapshots(client, snap.sandboxGroupId, EVAL_SNAPSHOT_NAME, KEEP_SNAPSHOTS);
+		log("info", "evaluation snapshot build finished", { snapshot: EVAL_SNAPSHOT_NAME, id: snap.id, ms: Date.now() - started });
+		return { id: snap.id, sandboxGroupId: snap.sandboxGroupId, name: EVAL_SNAPSHOT_NAME, manifest };
 	} finally {
 		await client.terminateQuietly(id);
 	}

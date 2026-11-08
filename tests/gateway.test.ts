@@ -1,8 +1,8 @@
 import { createHmac } from "node:crypto";
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import { config, type TaskName } from "../app/config/index.js";
-import { TriageInput } from "../app/schemas/tasks.js";
 import { createGateway, type GatewayDeps } from "../app/gateway/index.js";
+import { TriageInput } from "../app/schemas/tasks.js";
 import { REPO } from "./fixtures/config.js";
 
 const SECRET = "webhook-secret";

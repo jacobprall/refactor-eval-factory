@@ -240,7 +240,10 @@ async function checkTasks(opts: DoctorOptions, out: Reporter): Promise<void> {
 	}
 	const result = taskRows.safeParse(await response.json().catch(() => undefined));
 	if (!result.success) {
-		out.fail("task registration is unverified: Render returned an invalid task list", "Retry doctor; if this persists, check the Render API response schema");
+		out.fail(
+			"task registration is unverified: Render returned an invalid task list",
+			"Retry doctor; if this persists, check the Render API response schema",
+		);
 		return;
 	}
 	const found = new Set(result.data.map((row) => row.task.name));

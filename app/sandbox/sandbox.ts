@@ -7,10 +7,12 @@ import { errorMessage, log, SAFE_REF } from "./shell.js";
 import {
 	asRunner,
 	type BuiltSnapshot,
+	buildEvalSnapshot,
 	buildSnapshot,
 	computeLockfileHash,
 	credentialFile,
 	credentialHelperArgs,
+	EVAL_SNAPSHOT_NAME,
 	ensureRunnerPayload,
 	readToken,
 	resolveBaseHead,
@@ -56,6 +58,48 @@ export interface OpenSandboxDeps extends SnapshotDeps {
 	client?: SandboxClient;
 	resolveBaseHead?: (repo: RepoContext, deps: SnapshotDeps) => Promise<string>;
 	buildSnapshot?: (client: SandboxClient, repo: RepoContext, sha: string, deps: SnapshotDeps) => Promise<BuiltSnapshot>;
+}
+
+export interface OpenEvalSandboxDeps {
+	client?: SandboxClient;
+	buildSnapshot?: (client: SandboxClient) => Promise<BuiltSnapshot>;
+}
+
+/** Restores the generic runner snapshot, building it once when absent. No repository or GitHub credentials are involved. */
+export async function openEvalSandbox(deps: OpenEvalSandboxDeps = {}): Promise<Sandbox> {
+	const client = deps.client ?? sandboxClient();
+	const create = async () =>
+		(
+			await client.call(() =>
+				client.api.create({
+					snapshotName: EVAL_SNAPSHOT_NAME,
+					networkPolicy: ALLOW_ALL_EGRESS,
+					timeoutSeconds: config.sandbox.timeoutSeconds,
+				}),
+			)
+		).id;
+	let id: string;
+	try {
+		id = await create();
+	} catch (error) {
+		if (!isSnapshotUnavailable(error)) throw error;
+		log("warn", "no available evaluation snapshot; building one inline", {
+			snapshot: EVAL_SNAPSHOT_NAME,
+			error: errorMessage(error),
+		});
+		await (deps.buildSnapshot ?? buildEvalSnapshot)(client);
+		id = await create();
+	}
+	try {
+		await client.waitRunning(id);
+		await ensureRunnerPayload(client, id);
+		const info = await verifySandbox(client, id);
+		if (!info.runnerNonDumpable) throw new Error(`could not confirm the runner is non-dumpable in ${id}`);
+		return connectSandbox(id, client);
+	} catch (error) {
+		await client.terminateQuietly(id);
+		throw error;
+	}
 }
 
 /**

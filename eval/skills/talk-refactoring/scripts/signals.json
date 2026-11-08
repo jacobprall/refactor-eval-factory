@@ -1,0 +1,617 @@
+{
+	"version": 1,
+	"budget": 6,
+	"bundles": {
+		"source": "Read source files once; apply every routed card in this bundle.",
+		"test": "Read test files once; apply every routed card in this bundle.",
+		"module": "Judge the module as a whole (its map entry plus its largest files).",
+		"map": "Cross-module cards; run once per family over the map, not per module."
+	},
+	"cards": {
+		"reinvented-logic": {
+			"title": "Reinvented Logic",
+			"scope": "cross",
+			"bundle": "map",
+			"family": "duplication",
+			"signals": {
+				"duplicate-name": {
+					"kind": "metric",
+					"note": "Top-level function name defined in two or more files in different modules"
+				},
+				"literal-clone": {
+					"kind": "metric",
+					"note": "Six or more normalized lines shared verbatim between source files",
+					"weight": 0.5
+				},
+				"common-helper": {
+					"kind": "grep",
+					"note": "Hand-rolled generic helper (sleep, retry, debounce, chunk, slugify, ...) that a dependency or stdlib may already provide",
+					"files": "source",
+					"text": "code",
+					"patterns": {
+						"js": "^\\s*(?:export\\s+)?(?:async\\s+)?(?:function\\s+|(?:const|let)\\s+)(?:sleep|delay|wait|retry|withRetry|retryWithBackoff|debounce|throttle|deepClone|deepMerge|chunk|groupBy|uniq|unique|pick|omit|isEmpty|capitalize|slugify|formatDate|formatCurrency|formatBytes|truncate|escapeHtml|generateId|randomId|range|flatten|memoize|noop)\\b",
+						"py": "^\\s*(?:async\\s+)?def\\s+(?:sleep|retry|with_retry|backoff|chunk|chunks|chunked|flatten|deep_merge|merge_dicts|slugify|format_date|format_bytes|truncate|generate_id|memoize|batched|dedupe)\\b"
+					},
+					"weight": 0.5
+				},
+				"similar-responsibility": {
+					"kind": "model",
+					"note": "Two modules whose one-line responsibilities or domain terms overlap"
+				}
+			}
+		},
+		"inconsistent-solutions": {
+			"title": "Inconsistent Solutions",
+			"scope": "cross",
+			"bundle": "map",
+			"family": "duplication",
+			"signals": {
+				"dependency-family": {
+					"kind": "metric",
+					"note": "Two or more libraries for the same job (HTTP client, dates, logging, validation, ...)",
+					"weight": 2
+				},
+				"mixed-error-idioms": {
+					"kind": "metric",
+					"note": "Module both throws and returns error objects"
+				},
+				"synonym-terms": {
+					"kind": "model",
+					"note": "Different domain terms for one concept across modules"
+				}
+			}
+		},
+		"scattered-knowledge": {
+			"title": "Scattered Knowledge",
+			"scope": "cross",
+			"bundle": "map",
+			"family": "duplication",
+			"signals": {
+				"co-change": {
+					"kind": "git",
+					"note": "Files in different modules that keep changing in the same commits",
+					"weight": 2
+				},
+				"repeated-literal": {
+					"kind": "metric",
+					"note": "Same string literal in three or more source files (the 40 most widespread)",
+					"weight": 0.5
+				},
+				"switch-on-kind": {
+					"kind": "grep",
+					"note": "Branching on a type/kind/status field",
+					"files": "source",
+					"text": "code",
+					"patterns": {
+						"js": "switch\\s*\\(\\s*(?:[\\w$]+\\.)*(?:type|kind|status|role|mode|variant|tier|plan|state|event|action)\\s*\\)|\\b[\\w$]+(?:\\.[\\w$]+)*\\.(?:type|kind|status|role|mode|variant|tier|plan)\\s*[!=]==?\\s*['\\\"]",
+						"py": "\\bmatch\\s+(?:[\\w]+\\.)*(?:type|kind|status|role|mode|variant|tier|plan|state)\\s*:|\\b[\\w]+(?:\\.[\\w]+)*\\.(?:type|kind|status|role|mode|variant|tier|plan)\\s*[!=]=\\s*['\\\"]"
+					},
+					"min": 3
+				}
+			}
+		},
+		"overloaded-module": {
+			"title": "Overloaded Module",
+			"scope": "local",
+			"bundle": "module",
+			"signals": {
+				"large-file": {
+					"kind": "metric",
+					"note": "Source file in the repo's top 5% by size (and at least 150 lines)"
+				},
+				"many-exports": {
+					"kind": "metric",
+					"note": "File exports far more symbols than most files in the repo"
+				},
+				"hotspot": {
+					"kind": "git",
+					"note": "Large file that changes often (commits x lines)",
+					"weight": 2
+				},
+				"generic-name": {
+					"kind": "path",
+					"note": "File named utils, helpers, common, shared, manager, core, misc",
+					"files": "source",
+					"pattern": "(?i)(?:^|/)(?:utils?|helpers?|common|misc|shared|manager|core|stuff|general)(?:\\.[cm]?[jt]sx?|\\.py|/index\\.[cm]?[jt]sx?|/__init__\\.py)$"
+				}
+			}
+		},
+		"tangled-function": {
+			"title": "Tangled Function",
+			"scope": "local",
+			"bundle": "source",
+			"signals": {
+				"brain-function": {
+					"kind": "metric",
+					"note": "Function long, branchy and nested at once (repo top 10% on length and branches, nesting 3+)",
+					"weight": 2
+				},
+				"deep-nesting": {
+					"kind": "metric",
+					"note": "Function with four or more nested blocks"
+				},
+				"many-params": {
+					"kind": "metric",
+					"note": "Function with five or more parameters"
+				},
+				"step-comments": {
+					"kind": "grep",
+					"note": "'// Step 1', '# Phase 2' section comments inside code",
+					"files": "source",
+					"text": "raw",
+					"patterns": {
+						"js": "^\\s*(?://|/?\\*+)\\s*(?:Step|STEP|Phase|PHASE)\\s*\\d+\\b",
+						"py": "^\\s*#\\s*(?:Step|STEP|Phase|PHASE)\\s*\\d+\\b"
+					},
+					"min": 2
+				}
+			}
+		},
+		"shallow-modules": {
+			"title": "Shallow Modules",
+			"scope": "cross",
+			"bundle": "map",
+			"family": "abstraction",
+			"signals": {
+				"pass-through": {
+					"kind": "metric",
+					"note": "Named function whose whole body is one forwarding call"
+				},
+				"forwarding-arrow": {
+					"kind": "grep",
+					"note": "Top-level arrow function whose body is a single call",
+					"files": "source",
+					"text": "code",
+					"patterns": {
+						"js": "^(?:export\\s+)?const\\s+[\\w$]+\\s*(?::[^=\\n]+)?=\\s*(?:async\\s*)?\\([^()\\n]*\\)\\s*(?::[^=\\n]+)?=>\\s*(?:await\\s+)?[\\w$]+(?:\\.[\\w$]+)*\\([^()\\n]*\\)\\s*;?\\s*$"
+					}
+				},
+				"fragmented-module": {
+					"kind": "metric",
+					"note": "Module of six or more files with a median under 20 lines"
+				},
+				"shallow-interface": {
+					"kind": "map",
+					"note": "Exported interface nearly as large as the implementation"
+				}
+			}
+		},
+		"misleading-interface": {
+			"title": "Misleading Interface",
+			"scope": "cross",
+			"bundle": "map",
+			"family": "abstraction",
+			"signals": {
+				"self-reinvoke": {
+					"kind": "grep",
+					"note": "A method calling another public method of the same object with its own field, usually for the side effect",
+					"files": "source",
+					"text": "code",
+					"patterns": {
+						"js": "\\bthis\\.[a-z][\\w$]*\\(\\s*this\\.#?[\\w$]+\\s*\\)",
+						"py": "\\bself\\.[a-z]\\w*\\(\\s*self\\._*\\w+\\s*\\)"
+					}
+				},
+				"query-name-writes": {
+					"kind": "metric",
+					"note": "A function named like a read or a question (get, is, has, find, read, check, can, should) whose body writes"
+				},
+				"flag-parameter": {
+					"kind": "grep",
+					"note": "Functions that take a positional boolean parameter",
+					"files": "source",
+					"text": "code",
+					"patterns": {
+						"js": "^\\s*(?:export\\s+)?(?:async\\s+)?function\\s+[\\w$]+\\s*(?:<[^>]*>)?\\([^)]*\\b[\\w$]+\\s*\\??\\s*:\\s*boolean\\b[^)]*\\)",
+						"py": "^\\s*(?:async\\s+)?def\\s+\\w+\\([^)]*\\b\\w+\\s*:\\s*bool\\b"
+					},
+					"min": 2,
+					"weight": 0.5
+				},
+				"name-doc-mismatch": {
+					"kind": "model",
+					"note": "An export whose doc line describes I/O, cancellation, authority or a state change that its name doesn't suggest"
+				}
+			}
+		},
+		"speculative-generality": {
+			"title": "Speculative Generality",
+			"scope": "cross",
+			"bundle": "map",
+			"family": "abstraction",
+			"signals": {
+				"pattern-name": {
+					"kind": "grep",
+					"note": "Factory/Strategy/Builder/Registry/Plugin/Adapter classes and abstract bases",
+					"files": "source",
+					"text": "code",
+					"patterns": {
+						"js": "\\b(?:class|interface)\\s+[\\w$]*(?:Factory|Strategy|Builder|Registry|Plugin|Adapter)\\b|\\babstract\\s+class\\b",
+						"py": "^\\s*class\\s+\\w*(?:Factory|Strategy|Builder|Registry|Plugin|Adapter|Base)\\b|\\(\\s*(?:ABC|Protocol)\\s*\\)|@abstractmethod"
+					}
+				},
+				"interface-prefix": {
+					"kind": "grep",
+					"note": "I-prefixed interfaces (often written for one implementation)",
+					"files": "source",
+					"text": "code",
+					"patterns": {
+						"js": "^\\s*(?:export\\s+)?interface\\s+I[A-Z]\\w*"
+					},
+					"weight": 0.5
+				},
+				"single-implementation": {
+					"kind": "map",
+					"note": "Interface or abstract class with one implementation and no fake"
+				},
+				"test-only-export": {
+					"kind": "map",
+					"note": "Export imported only by test files"
+				}
+			}
+		},
+		"dead-code": {
+			"title": "Dead Code and Leftovers",
+			"scope": "cross",
+			"bundle": "map",
+			"family": "graph",
+			"signals": {
+				"versioned-file": {
+					"kind": "path",
+					"note": "_v2, _old, _backup, .bak, -copy files and old/ or deprecated/ folders",
+					"files": "all",
+					"pattern": "(?i)(?:[_-](?:v\\d+|old|new|backup|bak|copy|orig|deprecated|unused|tmp|temp)\\.\\w+$|\\.(?:bak|orig|old)$|(?:^|/)(?:old|backup|deprecated|unused)/)",
+					"weight": 2
+				},
+				"stray-root-script": {
+					"kind": "path",
+					"note": "Source file at the repo root that isn't a known entry point or config",
+					"files": "source",
+					"pattern": "^(?!(?:setup|conftest|manage|noxfile|fabfile|tasks|index|main|server|app|worker|vite|next|nuxt|astro|svelte|tailwind|postcss|eslint|prettier|jest|vitest|playwright|babel|webpack|rollup|tsup|drizzle|knip|biome)\\b)(?![^/]*\\.config\\.)[^/]+\\.(?:py|[cm]?[jt]s)$",
+					"weight": 0.5
+				},
+				"commented-out-code": {
+					"kind": "grep",
+					"note": "Comment lines that look like code",
+					"files": "source",
+					"text": "raw",
+					"patterns": {
+						"js": "^\\s*//\\s*(?:(?:const|let|var|function|return|if|for|while|import|export|await|class)\\b[^\\n]*[(=;{}][^\\n]*|[^\\n]*;\\s*)$",
+						"py": "^\\s*#\\s*(?:(?:def|class|return|import|from|if|for|while|print|await|raise)\\b[^\\n]*[(=:\\[][^\\n]*|[\\w.]+\\s*=\\s*[^\\n]+|[\\w.]+\\([^\\n]*\\)\\s*)$"
+					},
+					"min": 3
+				},
+				"unimported-export": {
+					"kind": "map",
+					"note": "Export with no importers"
+				},
+				"orphan-file": {
+					"kind": "map",
+					"note": "File with no inbound imports that is not an entry point"
+				},
+				"unused-warning": {
+					"kind": "probe",
+					"note": "Compiler or linter unused-symbol warning",
+					"weight": 2
+				}
+			}
+		},
+		"swallowed-errors": {
+			"title": "Swallowed Errors",
+			"scope": "local",
+			"bundle": "source",
+			"signals": {
+				"empty-catch": {
+					"kind": "grep",
+					"note": "Catch block or .catch() that does nothing",
+					"files": "source",
+					"text": "code",
+					"patterns": {
+						"js": "catch\\s*(?:\\([^)]*\\))?\\s*\\{\\s*\\}|\\.catch\\(\\s*(?:\\([^)]*\\)|[\\w$]+)?\\s*=>\\s*(?:\\{\\s*\\}|null|undefined|void\\s+0)\\s*\\)",
+						"py": "except\\b[^:\\n]*:\\s*\\n\\s*(?:pass|\\.\\.\\.)[ \\t]*$|except\\b[^:\\n]*:[ \\t]*pass\\b"
+					},
+					"weight": 2
+				},
+				"catch-default": {
+					"kind": "grep",
+					"note": "Catch that returns a default value (optionally after logging)",
+					"files": "source",
+					"text": "code",
+					"patterns": {
+						"js": "catch\\s*(?:\\([^)]*\\))?\\s*\\{\\s*(?:(?:console|logger|log)\\.\\w+\\([^;{}]*\\);?\\s*)?return\\b[^;{}\\n]*;?\\s*\\}|\\.catch\\(\\s*(?:\\([^)]*\\)|[\\w$]+)?\\s*=>\\s*(?:\\[\\]|\\(\\s*\\{\\s*\\}\\s*\\)|false|0|''|\\\"\\\")\\s*\\)",
+						"py": "except\\b[^:\\n]*:[ \\t]*\\n(?:[ \\t]*(?:logger|logging|log)\\.\\w+\\([^\\n]*\\)[ \\t]*\\n)?[ \\t]*(?:return\\b[^\\n]*|continue)[ \\t]*$"
+					},
+					"weight": 1.5
+				},
+				"log-and-continue": {
+					"kind": "grep",
+					"note": "Catch whose only action is logging",
+					"files": "source",
+					"text": "code",
+					"patterns": {
+						"js": "catch\\s*(?:\\([^)]*\\))?\\s*\\{\\s*(?:console|logger|log)\\.\\w+\\([^;{}]*\\);?\\s*\\}",
+						"py": "except\\b[^:\\n]*:[ \\t]*\\n[ \\t]*(?:logger|logging|log)\\.\\w+\\([^\\n]*\\)[ \\t]*\\n(?![ \\t]*(?:raise|return)\\b)"
+					}
+				},
+				"broad-except": {
+					"kind": "grep",
+					"note": "Bare except or except Exception",
+					"files": "source",
+					"text": "code",
+					"patterns": {
+						"py": "^\\s*except\\s*(?:\\(?\\s*(?:Exception|BaseException)\\s*\\)?)?\\s*(?:as\\s+\\w+)?\\s*:"
+					}
+				},
+				"nullish-default": {
+					"kind": "grep",
+					"note": "?? fallbacks to empty values (check whether the type can actually be null)",
+					"files": "source",
+					"text": "code",
+					"patterns": {
+						"js": "\\?\\?\\s*(?:\\[\\]|\\{\\}|''|\\\"\\\"|``|0|null|false|undefined)(?![\\w.])"
+					},
+					"min": 5,
+					"weight": 0.5
+				}
+			}
+		},
+		"hardwired-dependencies": {
+			"title": "Hardwired Dependencies",
+			"scope": "local",
+			"bundle": "source",
+			"signals": {
+				"inline-client": {
+					"kind": "grep",
+					"note": "Client, SDK or connection constructed inline",
+					"files": "source",
+					"text": "code",
+					"patterns": {
+						"js": "\\bnew\\s+(?:(?:[A-Z][\\w$]*)?(?:Client|SDK|Api|API|Pool|Connection)|Octokit|Stripe|Redis|OpenAI|Anthropic|S3)\\s*\\(|\\bcreate[A-Z][\\w$]*Client\\s*\\(",
+						"py": "\\b(?:boto3\\.(?:client|resource)|requests\\.Session|httpx\\.(?:Async)?Client|redis\\.(?:Redis|from_url)|psycopg2?\\.connect|create_engine|(?:[A-Z]\\w*)?Client)\\s*\\("
+					}
+				},
+				"env-read": {
+					"kind": "grep",
+					"note": "Environment read outside config files",
+					"files": "source",
+					"text": "code",
+					"patterns": {
+						"js": "\\bprocess\\.env\\b|\\bimport\\.meta\\.env\\b|\\bDeno\\.env\\.get\\b|\\bBun\\.env\\b",
+						"py": "\\bos\\.environ\\b|\\bos\\.getenv\\s*\\("
+					},
+					"exclude_path": "(^|/)(config|configs|env|settings|constants)(/|\\.[cm]?[jt]sx?$|\\.py$)|\\.config\\.[cm]?[jt]s$|(^|/)(settings|config)\\.py$"
+				},
+				"test-hook": {
+					"kind": "grep",
+					"note": "Production code that checks for tests or exposes test-only hooks",
+					"files": "source",
+					"text": "code",
+					"patterns": {
+						"js": "NODE_ENV\\s*[!=]==?\\s*['\\\"]test['\\\"]|process\\.env\\.(?:JEST_WORKER_ID|VITEST)\\b|\\b[\\w$]+ForTest(?:s|ing)?\\b|\\b__test(?:ing)?__\\b",
+						"py": "['\\\"]pytest['\\\"]\\s+in\\s+sys\\.modules|\\bPYTEST_CURRENT_TEST\\b|\\b\\w+_for_test(?:s|ing)?\\b"
+					},
+					"weight": 2
+				},
+				"module-singleton": {
+					"kind": "grep",
+					"note": "Module-level instance created at import time",
+					"files": "source",
+					"text": "code",
+					"patterns": {
+						"js": "^(?:export\\s+)?(?:const|let|var)\\s+[\\w$]+\\s*(?::\\s*[^=\\n]+)?=\\s*new\\s+(?!(?:Map|Set|WeakMap|WeakSet|Date|Error|RegExp|URL|URLSearchParams|TextEncoder|TextDecoder|Promise|Array|Object|Intl|AbortController|Headers|Response|Request|FormData|Blob|Proxy|Uint8Array|ArrayBuffer)\\b)[A-Z][\\w$]*",
+						"py": "^_?[a-z]\\w*\\s*=\\s*(?:[\\w.]+\\.)?(?:(?:[A-Z]\\w*)?(?:Client|Session|Engine|Pool|Connection)|create_engine|client|redis\\.Redis)\\s*\\("
+					}
+				}
+			}
+		},
+		"import-tangle": {
+			"title": "Import Tangle",
+			"scope": "cross",
+			"bundle": "map",
+			"family": "graph",
+			"signals": {
+				"deep-relative-import": {
+					"kind": "grep",
+					"note": "Imports that climb three or more directories",
+					"files": "source",
+					"text": "code",
+					"patterns": {
+						"js": "(?:from\\s+|require\\(\\s*|import\\(\\s*)['\\\"](?:\\.\\./){3,}",
+						"py": "^\\s*from\\s+\\.{3,}"
+					}
+				},
+				"private-reach": {
+					"kind": "grep",
+					"note": "Imports of another module's private or internal members",
+					"files": "source",
+					"text": "code",
+					"patterns": {
+						"js": "(?:from\\s+|require\\(\\s*)['\\\"](?:@/|~/|(?:\\.\\./){2,})[^'\\\"\\n]*/(?:_[\\w-]+|internal|private)(?:/[^'\\\"\\n]*)?['\\\"]",
+						"py": "^\\s*from\\s+[\\w.]+\\s+import\\s+(?:\\(\\s*)?_[a-zA-Z]\\w*"
+					}
+				},
+				"cycle": {
+					"kind": "map",
+					"note": "Import cycle crossing module boundaries",
+					"weight": 3
+				},
+				"hub": {
+					"kind": "map",
+					"note": "Module with fan-in and fan-out both high for this repo"
+				}
+			}
+		},
+		"toothless-tests": {
+			"title": "Toothless Tests",
+			"scope": "local",
+			"bundle": "test",
+			"signals": {
+				"assertion-free-file": {
+					"kind": "metric",
+					"note": "Test file with test cases but no assertions",
+					"weight": 3
+				},
+				"skip-marker": {
+					"kind": "grep",
+					"note": "Skipped or todo tests",
+					"files": "test",
+					"text": "code",
+					"patterns": {
+						"js": "\\b(?:it|test|describe)\\.(?:skip|todo)\\b|\\bx(?:it|test|describe)\\s*\\(",
+						"py": "@pytest\\.mark\\.(?:skip|xfail)\\b|@unittest\\.skip|\\bpytest\\.skip\\s*\\(|\\bself\\.skipTest\\s*\\("
+					},
+					"weight": 2
+				},
+				"print-in-test": {
+					"kind": "grep",
+					"note": "Printing instead of asserting",
+					"files": "test",
+					"text": "code",
+					"patterns": {
+						"js": "\\bconsole\\.(?:log|info|debug)\\s*\\(",
+						"py": "^\\s*print\\s*\\("
+					},
+					"min": 2
+				},
+				"weak-assertion": {
+					"kind": "grep",
+					"note": "Assertions that pass for almost any value",
+					"files": "test",
+					"text": "code",
+					"patterns": {
+						"js": "\\.(?:toBeDefined|toBeTruthy)\\s*\\(\\s*\\)|\\.not\\.(?:toBeNull|toBeUndefined)\\s*\\(\\s*\\)|\\.toBe\\(\\s*true\\s*\\)",
+						"py": "^\\s*assert\\s+[\\w.\\[\\]'\\\"]+(?:\\s+is\\s+not\\s+None)?\\s*$|\\bassert(?:IsNotNone|True)\\s*\\(\\s*[\\w.]+\\s*\\)"
+					},
+					"min": 3,
+					"weight": 0.5
+				},
+				"swallow-in-test": {
+					"kind": "grep",
+					"note": "A catch inside a test that is empty or only logs, so the failure never reaches the runner",
+					"files": "test",
+					"text": "code",
+					"patterns": {
+						"js": "catch\\s*(?:\\([^)]*\\))?\\s*\\{\\s*(?:(?:console|logger|log)\\.\\w+\\([^;{}]*\\);?\\s*)?\\}",
+						"py": "except\\b[^:\\n]*:[ \\t]*\\n[ \\t]*(?:pass|print\\([^\\n]*\\)|(?:logger|logging|log)\\.\\w+\\([^\\n]*\\))[ \\t]*$"
+					}
+				},
+				"survives-stub": {
+					"kind": "probe",
+					"note": "Test still passes after the function under test is stubbed out",
+					"weight": 3
+				}
+			}
+		},
+		"implementation-coupled-tests": {
+			"title": "Implementation-Coupled Tests",
+			"scope": "local",
+			"bundle": "test",
+			"signals": {
+				"mock-heavy-file": {
+					"kind": "metric",
+					"note": "Test file with far more mocks than most test files in the repo",
+					"weight": 2
+				},
+				"call-assertion": {
+					"kind": "grep",
+					"note": "Assertions on calls to collaborators",
+					"files": "test",
+					"text": "code",
+					"patterns": {
+						"js": "\\.(?:toHaveBeenCalledTimes|toHaveBeenNthCalledWith|toHaveBeenCalledWith|toHaveBeenLastCalledWith|toHaveBeenCalled)\\s*\\(|\\.(?:calledWith|calledOnce|callCount)\\b",
+						"py": "\\.assert_(?:called|called_once|called_with|called_once_with|has_calls|any_call|not_called)\\b|\\.call_count\\b|\\.call_args(?:_list)?\\b"
+					},
+					"min": 3
+				},
+				"module-patch": {
+					"kind": "grep",
+					"note": "Tests that patch the project's own modules by path",
+					"files": "test",
+					"text": "code",
+					"patterns": {
+						"js": "\\b(?:jest|vi)\\.(?:mock|doMock)\\(\\s*['\\\"]\\.{1,2}/",
+						"py": "@?(?:mock\\.)?patch(?:\\.object)?\\(\\s*['\\\"]\\w+\\.[\\w.]+['\\\"]"
+					}
+				},
+				"snapshot": {
+					"kind": "grep",
+					"note": "Snapshot assertions",
+					"files": "test",
+					"text": "code",
+					"patterns": {
+						"js": "\\.toMatch(?:Inline)?Snapshot\\s*\\(",
+						"py": "\\bsnapshot\\b"
+					},
+					"min": 3,
+					"weight": 0.5
+				},
+				"source-text-read": {
+					"kind": "grep",
+					"note": "Tests that read the project's own source files as text",
+					"files": "test",
+					"text": "code",
+					"patterns": {
+						"js": "(?:readFileSync|readFile)\\([^)\\n]*['\\\"][^'\\\"\\n]*(?:^|/|\\b)(?:src|app|lib)/[^'\\\"\\n]*\\.[cm]?[jt]sx?['\\\"]",
+						"py": "\\bopen\\([^)\\n]*['\\\"][^'\\\"\\n]*(?:src|app|lib)/[^'\\\"\\n]*\\.py['\\\"]|read_text\\(\\)[^\\n]*\\b(?:def|class)\\b"
+					},
+					"weight": 2
+				}
+			}
+		},
+		"bloated-test-setup": {
+			"title": "Bloated Test Setup",
+			"scope": "local",
+			"bundle": "test",
+			"signals": {
+				"duplicate-setup": {
+					"kind": "metric",
+					"note": "Six or more normalized lines repeated three or more times across tests"
+				},
+				"magic-number-assert": {
+					"kind": "grep",
+					"note": "Assertions against unexplained large numbers (HTTP status codes 100-599 excluded)",
+					"files": "test",
+					"text": "code",
+					"patterns": {
+						"js": "\\.(?:toBe|toEqual|toStrictEqual)\\(\\s*-?(?:\\d{4,}|[6-9]\\d\\d|\\d{3,}\\.\\d+)\\s*\\)",
+						"py": "^\\s*assert\\s+[^\\n]*==\\s*-?(?:\\d{4,}|[6-9]\\d\\d|\\d{3,}\\.\\d+)\\s*$"
+					},
+					"min": 3,
+					"weight": 0.5
+				}
+			}
+		},
+		"narrating-comments": {
+			"title": "Narrating Comments",
+			"scope": "local",
+			"bundle": "source",
+			"signals": {
+				"change-narration": {
+					"kind": "grep",
+					"note": "Comments narrating the edit ('now uses X instead of Y')",
+					"files": "source",
+					"text": "raw",
+					"patterns": {
+						"js": "(?i)^\\s*(?://|/?\\*+)[^\\n]*\\b(?:now (?:uses|returns|calls|handles|supports)|no longer|was changed|changed (?:to|from)|updated to|new (?:implementation|approach|version)|refactored|moved (?:to|from)|replaced (?:with|by))\\b",
+						"py": "(?i)^\\s*#[^\\n]*\\b(?:now (?:uses|returns|calls|handles|supports)|no longer|was changed|changed (?:to|from)|updated to|new (?:implementation|approach|version)|refactored|moved (?:to|from)|replaced (?:with|by))\\b"
+					}
+				},
+				"restating-comment": {
+					"kind": "grep",
+					"note": "Comments that restate the next line ('// Create the client')",
+					"files": "source",
+					"text": "raw",
+					"patterns": {
+						"js": "^\\s*//\\s*(?:Import|Imports|Return|Returns|Create|Creates|Initialize|Initialise|Define|Call|Calls|Loop (?:through|over)|Iterate (?:through|over)|Check if|Set (?:the|up)|Get (?:the|all)|Increment|Add (?:the|a)|Update (?:the|state)|Export|Declare)\\b",
+						"py": "^\\s*#\\s*(?:Import|Imports|Return|Returns|Create|Creates|Initialize|Initialise|Define|Call|Calls|Loop (?:through|over)|Iterate (?:through|over)|Check if|Set (?:the|up)|Get (?:the|all)|Increment|Add (?:the|a)|Update (?:the|state)|Export|Declare)\\b"
+					},
+					"min": 3
+				},
+				"comment-dense-file": {
+					"kind": "metric",
+					"note": "File whose comment-line share is in the repo's top 10% (and at least 25%)"
+				}
+			}
+		}
+	}
+}

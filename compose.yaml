@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: refactor_eval
+      POSTGRES_USER: refactor_eval
+      POSTGRES_PASSWORD: refactor_eval
+    ports:
+      - "54329:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U refactor_eval -d refactor_eval"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+    volumes:
+      - refactor-eval-postgres:/var/lib/postgresql/data
+
+volumes:
+  refactor-eval-postgres:

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { config } from "../app/config/index.js";
-import { AutopilotInput, PrReviewInput, SpecToPrInput, TriageInput } from "../app/schemas/tasks.js";
 import { route } from "../app/gateway/routes.js";
+import { AutopilotInput, PrReviewInput, SpecToPrInput, TriageInput } from "../app/schemas/tasks.js";
 import { REPO, REPOSITORY_CASES } from "./fixtures/config.js";
 
 const BASE = config.repos[REPO]?.baseBranch as string;

@@ -1,41 +1,29 @@
-# software-factory: two services in a software-factory project.
-# - factory-gateway: verifies GitHub webhooks and starts the matching Workflows task.
-# - factory-workflows: runs every task (agents, snapshot refresh, cancel). It has no `repo` field, so it
-#   deploys from the same repository as this Blueprint, including forks.
-# Run and agent telemetry is logged as JSON lines; find it in each service's logs or a log stream.
-#
-# Secrets live in three environment groups that `npm run setup:render` creates from .env before this
-# Blueprint is applied. Blueprint groups can't hold `sync: false` values, so the groups are not defined here.
-# The gateway links no group that holds GitHub App credentials or a model key.
+# Refactor Eval Factory runs matrix experiments as Render Workflows tasks.
+# Agent code executes in disposable Sandboxes; per-iteration evidence is durable in Postgres.
+# Workflows have no pre-deploy step: the experiment task applies the idempotent migrations before it writes.
 
 projects:
-  - name: software-factory
+  - name: refactor-eval-factory
     environments:
       - name: production
         services:
-          - type: web
-            name: factory-gateway
-            region: oregon
-            runtime: node
-            plan: starter
-            buildCommand: npm ci
-            startCommand: npm run start:gateway
-            healthCheckPath: /ready
-            envVars:
-              - fromGroup: software-factory-shared
-              - fromGroup: software-factory-gateway
-              - key: RENDER_WORKFLOW_SLUG
-                fromService:
-                  type: workflow
-                  name: factory-workflows
-                  property: slug
-
           - type: workflow
-            name: factory-workflows
+            name: refactor-eval-workflows
             region: oregon
             runtime: node
+            repo: https://github.com/jacobprall/refactor-eval-factory
             buildCommand: npm ci
             startCommand: npm run start:workflows
             envVars:
-              - fromGroup: software-factory-shared
-              - fromGroup: software-factory-workflows
+              - fromGroup: refactor-eval-shared
+              - fromGroup: refactor-eval-workflows
+              - key: DATABASE_URL
+                fromDatabase:
+                  name: refactor-eval-results
+                  property: connectionString
+        databases:
+          - name: refactor-eval-results
+            databaseName: refactor_eval
+            user: refactor_eval
+            region: oregon
+            plan: basic-256mb

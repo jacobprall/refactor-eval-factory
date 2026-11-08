@@ -1,7 +1,7 @@
 /** What the factory needs from GitHub and from each service's environment, in one place for setup and doctor. */
 import { AGENTS } from "../../app/agents/registry.js";
-import { config } from "../../app/config/index.js";
 import { WORKING_LABEL } from "../../app/claims/status.js";
+import { config } from "../../app/config/index.js";
 
 /**
  * Repository permissions the App requests. Each is used by app/:
@@ -83,10 +83,10 @@ export interface EnvGroupSpec {
  * The gateway links no group that holds GitHub App credentials or a model key.
  */
 export const ENV_GROUPS: readonly EnvGroupSpec[] = [
-	{ name: "software-factory-shared", services: ["gateway", "workflows"], keys: ["RENDER_API_KEY"] },
-	{ name: "software-factory-gateway", services: ["gateway"], keys: ["GITHUB_WEBHOOK_SECRET"] },
+	{ name: "refactor-eval-shared", services: ["gateway", "workflows"], keys: ["RENDER_API_KEY"] },
+	{ name: "refactor-eval-gateway", services: ["gateway"], keys: ["GITHUB_WEBHOOK_SECRET"] },
 	{
-		name: "software-factory-workflows",
+		name: "refactor-eval-workflows",
 		services: ["workflows"],
 		keys: ["RENDER_WORKSPACE_ID", "GITHUB_APP_ID", "GITHUB_APP_PRIVATE_KEY", ...HARNESS_KEY_ENV],
 	},

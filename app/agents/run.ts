@@ -3,7 +3,7 @@ import type { z } from "zod";
 import { emit } from "../events/index.js";
 import { errorMessage } from "../runner/core/emit.js";
 import { PROTOCOL_VERSION, type RunnerErrorCode, RunnerEvent, type RunnerInput, type ToolName, type Usage } from "../runner/core/protocol.js";
-import { APP_DIR, REPO_DIR, SCRATCH_DIR, type Sandbox } from "../sandbox/types.js";
+import { APP_DIR, REPO_DIR, type Sandbox, SCRATCH_DIR } from "../sandbox/types.js";
 import type { Agent, OutputSchema } from "./define.js";
 
 const DEFAULT_TIMEOUT_MS = 30 * 60 * 1000;
@@ -14,6 +14,8 @@ export type AgentErrorCode = RunnerErrorCode | "output_invalid" | "runner_lost";
 
 export class AgentError extends Error {
 	override readonly name = "AgentError";
+	/** What the run consumed before it failed, when the runner reported any usage. */
+	spent?: { usage: Usage; costUsd: number; turns: number };
 	constructor(
 		readonly agentId: string,
 		readonly code: AgentErrorCode,
@@ -33,6 +35,10 @@ export interface RunAgentOptions {
 	subject?: string;
 	/** Default 30 minutes. */
 	timeoutMs?: number;
+	/** Working directory exposed to the agent. Defaults to the repository checkout. */
+	cwd?: string;
+	/** Writable HOME/TMP area. Defaults to the sandbox scratch directory. */
+	scratchDir?: string;
 	signal?: AbortSignal;
 }
 
@@ -89,8 +95,8 @@ export async function runAgent<Tools extends readonly ToolName[], Output extends
 			output_schema: agent.outputJsonSchema,
 			max_turns: agent.maxTurns,
 			timeout_ms: timeoutMs,
-			cwd: REPO_DIR,
-			scratch_dir: SCRATCH_DIR,
+			cwd: base.cwd ?? REPO_DIR,
+			scratch_dir: base.scratchDir ?? SCRATCH_DIR,
 		};
 		const apiKey = process.env[harness.credential]?.trim();
 		if (!apiKey) throw failure("agent_error", `${harness.credential} is not set: the ${harness.name} harness needs it`);
@@ -111,6 +117,7 @@ export async function runAgent<Tools extends readonly ToolName[], Output extends
 		return { output: parsed.data, usage: summary.usage, costUsd: summary.costUsd, turns: summary.turns };
 	} catch (err) {
 		const error = err instanceof AgentError ? err : failure("agent_error", errorMessage(err));
+		error.spent = { usage: summary.usage, costUsd: summary.costUsd, turns: summary.turns };
 		finish(error.code, summary, error.message);
 		throw error;
 	}

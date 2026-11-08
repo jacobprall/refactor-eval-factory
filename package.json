@@ -1,11 +1,11 @@
 {
-  "name": "software-factory",
+  "name": "refactor-eval-factory",
   "version": "0.1.0",
   "private": true,
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/render-examples/software-factory.git"
+    "url": "git+https://github.com/jacobprall/refactor-eval-factory.git"
   },
   "type": "module",
   "engines": {
@@ -16,12 +16,20 @@
     "start:workflows": "tsx app/entrypoints/workflows.ts",
     "dev:gateway": "node --env-file=.env node_modules/.bin/tsx watch app/entrypoints/gateway.ts",
     "dev:workflows": "render workflows dev -- node --env-file=.env node_modules/.bin/tsx app/entrypoints/workflows.ts",
+    "dev:eval": "render workflows dev --env-file .env.local -- npm run start:workflows",
     "setup:app": "node --env-file-if-exists=.env --import tsx scripts/setup-app.ts",
     "setup:preflight": "node --env-file-if-exists=.env --import tsx scripts/preflight.ts",
     "setup:render": "node --env-file-if-exists=.env --import tsx scripts/setup-render.ts",
     "setup:github": "node --env-file-if-exists=.env --import tsx scripts/setup-github.ts",
     "doctor": "node --env-file-if-exists=.env --import tsx scripts/doctor.ts",
-    "lint": "biome lint --error-on-warnings app scripts tests factory.config.ts",
+    "eval": "node --env-file-if-exists=.env --import tsx scripts/eval.ts",
+    "eval:local": "node --env-file-if-exists=.env.local --import tsx scripts/eval.ts",
+    "eval:analyze": "node --env-file-if-exists=.env --import tsx scripts/eval-analyze.ts",
+    "eval:analyze:local": "node --env-file-if-exists=.env.local --import tsx scripts/eval-analyze.ts",
+    "eval:compare-health:local": "node --env-file-if-exists=.env.local --import tsx scripts/eval-metric-compare.ts",
+    "eval:migrate": "node --env-file-if-exists=.env --import tsx scripts/migrate.ts",
+    "eval:migrate:local": "node --env-file-if-exists=.env.local --import tsx scripts/migrate.ts",
+    "lint": "biome lint --error-on-warnings app eval scripts tests factory.config.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "check": "npm run lint && npm run typecheck && npm test"
@@ -33,15 +41,17 @@
     "@renderinc/sdk": "^1.3.0",
     "esbuild": "^0.28.2",
     "hono": "^4.0.0",
+    "pg": "^8.23.1",
     "tar": "^7.5.22",
     "tsx": "^4.19.0",
     "typebox": "1.3.7",
+    "typescript": "^5.9.3",
     "zod": "^4.6.7"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.11",
     "@types/node": "^22.0.0",
-    "typescript": "^5.5.0",
+    "@types/pg": "^8.23.1",
     "vitest": "^4.1.11"
   }
 }
