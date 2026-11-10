@@ -62,57 +62,21 @@ export const RefreshSnapshotInput = RepoInput.extend({
 	sha: z.string().regex(/^[0-9a-f]{40}$/),
 });
 
-export const EvalScenarioId = z.enum([
-	"baseline",
-	"periodic-after",
-	"triggered-after",
-	"evidence-seeking",
-	"refactor-after-3",
-	"refactor-after-6",
-	"refactor-after-9",
-	"refactor-after-6-guarded",
-	"refactor-after-6-briefed",
-	"refactor-after-6-playbook",
-	"health-triggered",
-	"health-safeguard",
-	"skill-review",
-	"skill-review-health-gated",
-	"skill-review-maturity-gated",
-	"skill-review-coupling-gated",
-	"signals-only",
-	"signals-skill",
-]);
-
-export const EvalTargetId = z.enum([
-	"subscription-billing",
-	"inventory-reservations",
-	"approval-workflows",
-	"notification-routing",
-	"access-control",
-	"event-scheduling",
-	"usage-metering",
-	"commerce-monolith",
-	"commerce-monolith-elsewhere",
-	"commerce-monolith-clean",
-]);
-
-export const RunExperimentInput = z.object({
-	experimentId: z.uuid().optional(),
-	replicates: z.number().int().min(1).max(20).default(1),
-	maxConcurrency: z.number().int().min(1).max(100).default(8),
-	targetIds: z.array(EvalTargetId).min(1).max(EvalTargetId.options.length).optional(),
-	scenarioIds: z.array(EvalScenarioId).min(1).max(EvalScenarioId.options.length).optional(),
+/** A push to the base branch; the gate reads the signals at this commit. */
+export const RefactorGateInput = RepoInput.extend({
+	sha: z.string().regex(/^[0-9a-f]{40}$/),
 });
 
-export const RunTrajectoryInput = z.object({
-	experimentId: z.uuid(),
-	targetId: EvalTargetId,
-	scenarioId: EvalScenarioId,
-	replicate: z.number().int().min(0).max(19),
+/** The approval label on a refactor proposal the gate opened. */
+export const RefactorApplyInput = RepoInput.extend({
+	issue: z.number().int().positive(),
+	actor: ActorLogin,
 });
 
-export const SummarizeExperimentInput = z.object({
-	experimentId: z.uuid(),
+export const RefactorReviewInput = RepoInput.extend({
+	pr: z.number().int().positive(),
+	headSha: z.string().regex(/^[0-9a-f]{40}$/),
+	actor: ActorLogin,
 });
 
 export type TriageInput = z.infer<typeof TriageInput>;
@@ -122,6 +86,6 @@ export type SpecToPrInput = z.infer<typeof SpecToPrInput>;
 export type PrReviewInput = z.infer<typeof PrReviewInput>;
 export type CancelInput = z.infer<typeof CancelInput>;
 export type RefreshSnapshotInput = z.infer<typeof RefreshSnapshotInput>;
-export type RunExperimentInput = z.infer<typeof RunExperimentInput>;
-export type RunTrajectoryInput = z.infer<typeof RunTrajectoryInput>;
-export type SummarizeExperimentInput = z.infer<typeof SummarizeExperimentInput>;
+export type RefactorGateInput = z.infer<typeof RefactorGateInput>;
+export type RefactorApplyInput = z.infer<typeof RefactorApplyInput>;
+export type RefactorReviewInput = z.infer<typeof RefactorReviewInput>;

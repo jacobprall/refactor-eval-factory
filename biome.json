@@ -1,14 +1,7 @@
 {
 	"$schema": "https://biomejs.dev/schemas/2.5.11/schema.json",
 	"files": {
-		"includes": [
-			"app/**",
-			"eval/**",
-			"scripts/**",
-			"tests/**",
-			"factory.config.ts",
-			"!eval/targets/commerce/**"
-		]
+		"includes": ["app/**", "scripts/**", "tests/**", "factory.config.ts"]
 	},
 	"formatter": {
 		"enabled": true,

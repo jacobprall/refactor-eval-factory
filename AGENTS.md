@@ -26,7 +26,8 @@ is complete until both `doctor` checks and the Triage smoke test pass.
 software-factory deploys two processes:
 
 - `app/entrypoints/gateway.ts` verifies webhooks and starts tasks.
-- `app/entrypoints/workflows.ts` registers and runs tasks.
+- `app/entrypoints/workflows.ts` registers and runs tasks, including the
+ outer loop: the refactor gate, refactor, and refactor review.
 
 Agents run inside Render Sandboxes. Only code in the Workflows service writes
 to GitHub. GitHub and Render Workflows hold application state; there is no
@@ -103,8 +104,13 @@ strict output schemas.
   model only the factory's tools; add it to `HARNESSES` in
   `tests/helpers/runner.ts` if it can run the conformance suite.
 - `sandbox/`: refresh every repository snapshot after deployment. Changes to
-  `app/runner/`, `app/harness/`, or agents reach Sandboxes with the Workflows
-  deploy, because each Sandbox replaces a stale runner bundle when it opens.
+ `app/runner/`, `app/harness/`, or agents reach Sandboxes with the Workflows
+ deploy, because each Sandbox replaces a stale runner bundle when it opens.
+- `skills/refactoring/`: reaches Sandboxes with the Workflows deploy; the
+ refactor tasks install it outside the checkout on every run. Keep it out of
+ the runner bundle and out of published changes.
+- Refactor gate signals or thresholds (`app/refactor/`): update
+ `docs/architecture.md#refactor-gate` and `tests/refactor-signals.test.ts`.
 
 ## Verify
 

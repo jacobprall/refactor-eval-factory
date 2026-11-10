@@ -81,6 +81,22 @@ describe("gateway", () => {
 		expect(TriageInput.safeParse(input).success).toBe(true);
 	});
 
+	it("starts every task a push routes to, each with its own idempotency key", async () => {
+		const body = JSON.stringify({
+			ref: "refs/heads/main",
+			after: "a".repeat(40),
+			repository: { full_name: REPO },
+			installation: { id: 7 },
+			sender: { login: "maintainer", type: "User" },
+		});
+		const res = await app.fetch(webhook(body, { event: "push" }));
+		expect(res.status).toBe(202);
+		expect(startTask.mock.calls.map(([task, , key]) => [task, key])).toEqual([
+			["refresh-snapshot", `${REPO}@${"a".repeat(40)}`],
+			["refactor-gate", `${REPO}@${"a".repeat(40)}:refactor-gate`],
+		]);
+	});
+
 	it("returns 502 and logs why when startTask fails, so GitHub records a failed delivery", async () => {
 		const warn = vi.spyOn(console, "error").mockImplementation(() => {});
 		startTask.mockRejectedValueOnce(new Error("render down"));

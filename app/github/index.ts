@@ -6,10 +6,12 @@ export {
 	findMarkedComment,
 	type MarkerData,
 	type MarkerKind,
+	type ProposalMarker,
 	parseMarker,
 	type RunState,
 	renderMarker,
 	type SpecMarker,
+	type SpendMarker,
 	type StatusMarker,
 } from "./markers.js";
 export { GitHubHttp, type GitHubHttpOptions, type RequestOptions, type TokenProvider } from "./request.js";

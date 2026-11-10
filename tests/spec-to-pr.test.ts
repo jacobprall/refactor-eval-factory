@@ -158,7 +158,8 @@ function fakeAgents(steps: { implementer?: AgentStep[] }) {
 		const step = queues[agent.id]?.shift();
 		if (!step) throw new Error(`unexpected ${agent.id} call`);
 		if (step instanceof AgentError) throw step;
-		return { output: step.output, costUsd: 0, usage: {}, turns: 1 };
+		const usage = { input_tokens: 2_000, output_tokens: 5_000, cache_read_tokens: 400_000, cache_write_tokens: 30_000, cost_usd: 0.25 };
+		return { output: step.output, costUsd: 0.25, usage, turns: 1 };
 	});
 	return { runAgent: runAgent as unknown as SpecToPrDeps["runAgent"], calls };
 }
@@ -322,6 +323,13 @@ describe("implement, verify, and publish", () => {
 		const body = t.gh.ensurePull.mock.calls[0]?.[0].body ?? "";
 		expect(body).toContain("Added GET /health.");
 		expect(body).toContain("Add metrics");
+		// Spend covers every implementation run, repairs included, so the cost report prices the whole change.
+		expect(body).toContain("Agent spend: $0.50, 804K tokens read, 10K written.");
+		expect(parseMarker(body, "spend")).toEqual({
+			kind: "feature",
+			costUsd: 0.5,
+			tokens: { input: 4_000, output: 10_000, cacheRead: 800_000, cacheWrite: 60_000 },
+		});
 	});
 
 	it("fails without publishing when repairs run out, naming the failing commands but not their output", async () => {

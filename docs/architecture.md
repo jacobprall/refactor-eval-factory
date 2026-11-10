@@ -31,7 +31,17 @@ process, maintenance loop, or database.
 issue --factory:triage--> specification
 specification --factory:spec-approved--> draft pull request
 pull request --factory:pr-review--> COMMENT review
+
+push to the base branch --signals fire--> refactor proposal issue
+refactor proposal --factory:refactor-approved--> draft refactor pull request
+pull request --factory:refactor-review--> refactoring review comment
 ```
+
+The first three lines are the inner loop: one change request at a time. The
+last three are the outer loop, which keeps the code those changes land in
+cheap to change. It separates when to refactor from what to refactor: plain
+code decides when, from change history, and the refactoring skill decides
+what, only when the code points somewhere.
 
 ### Triage
 
@@ -68,6 +78,55 @@ questions, the parent adds `factory:autopilot` back before it ends; a human
 reply starts a new parent run. At other times the trigger label is absent, so
 unrelated comments do not restart the workflow.
 
+### Refactor gate
+
+Every push to the base branch of a repository with `refactor` configured
+starts the refactor gate beside the snapshot refresh. The gate reads the last
+five merges in a Sandbox and computes three signals with no model:
+
+- **Heat:** files changed in 3 of the last 4 merges.
+- **Health:** cognitive complexity above 15 per function and copies of 50 or
+  more tokens, scored down from 10, with a bar at 9.5.
+- **Coupling:** files in two or more directories that changed together in 3
+  of the last 4 merges.
+
+The gate opens on a hot file below the health bar that got less healthy over
+the window, or on a coupled cluster. It fires only on the merge where that
+problem first appears, so a problem that persists doesn't cost a review on
+every merge. Hard code nobody is changing never opens it.
+
+When it fires, the gate installs the refactoring skill, writes people's past
+rejections into the skill's ledger, and has the refactor reviewer review the
+window's merges as one change, starting from the files the signals named. The
+reviewer may decline. Otherwise the gate opens one issue labeled
+`factory:refactor-proposal` with the brief, the chosen finding, and the
+review's spend. It opens at most one at a time.
+
+### Refactor
+
+Applying `factory:refactor-approved` to a proposal starts the refactor task.
+In one Sandbox at the base branch head:
+
+1. the replay author writes a deterministic replay of the code at the
+   finding's sites;
+2. the workflow runs it twice, keeps it only if both outputs match, and moves
+   it into a root-only directory;
+3. the refactor applier applies the finding behind characterization tests;
+4. the workflow restores the replay, runs it again, and discards the refactor
+   if any output line changed;
+5. the configured verify commands run; and
+6. Workflows publishes `factory/refactor-<issue>` and opens a draft pull
+   request that closes the proposal when merged.
+
+`factory:refactor-rejected` drops a proposal. The rejected issues are the
+ledger: later reviews never propose those findings again.
+
+### Refactor Review
+
+`factory:refactor-review` on a pull request runs the refactor reviewer on the
+pull request's diff and posts one comment for its head commit. It changes no
+code.
+
 ## State
 
 Each system owns the state it already manages:
@@ -77,8 +136,14 @@ Each system owns the state it already manages:
 | Task status, timing, input, and result | Render Workflows |
 | Issues, labels, specifications, pull requests, and reviews | GitHub |
 | Current run and Sandbox for an issue or pull request | App-authored status comment |
+| Refactor proposals and rejected findings | App-authored issues and their labels |
+| Agent spend on each factory change | Hidden marker on its pull request |
 | Prepared repository filesystem | Render Sandbox snapshot |
 | Run and agent outcomes, usage, and cost | JSON lines in Workflows logs |
+
+The refactor gate keeps no state of its own. It recomputes the signals from
+git history on every push, and its edge trigger compares two windows of that
+same history.
 
 Telemetry is not application state. Nothing reads log events to decide what a
 task may do.
@@ -216,10 +281,19 @@ Changes must preserve these properties:
 5. Run every model-directed tool inside a Sandbox.
 6. Build repositories, refs, branches, and write targets from trusted input.
 7. Publish only after GitHub reproduces the validated tree SHA.
-8. Stop automation at a draft pull request and a COMMENT review.
+8. Stop automation at a draft pull request, a COMMENT review or comment, and a
+   proposal issue. Only a person's label applies a refactor.
 9. Implement the specification as it existed when approved.
 10. Give every Sandbox a provider timeout and `finally` cleanup. Record a
     GitHub task's Sandbox so cancellation can terminate it.
+11. Keep the replay away from the agent it grades: record it before the
+    applier runs, hold it root-only while it runs, and publish a refactor only
+    when the replay's output is unchanged and every verify command passes.
+12. Trust proposal, review, and spend markers only on App-authored issues,
+    comments, and pull requests.
+13. Keep the refactoring skill and its working files out of published
+    changes: the skill lives outside the checkout, and `.refactor/` is reset
+    before publishing.
 
 Tests pin these invariants and the tool authority of every built-in agent.
 
@@ -230,6 +304,12 @@ Tests pin these invariants and the tool authority of every built-in agent.
 - Prompt injection can influence specifications, code, and reviews.
 - Anyone with `minimumPermission` can start model spend.
 - PR Reviewer runs repository-defined commands from the labeled pull request.
+- Anyone who can push to a base branch with the gate on can start one review's
+  model spend, at most once per newly formed problem.
+- The replay runs through the repository's own tooling, which the applier can
+  edit; verification and the draft PR's human review back the replay up.
+- The refactor reviewer has write tools because the skill writes working
+  files; the workflow discards everything it changed.
 - The Render API key may have workspace-wide authority.
 - Near-simultaneous triggers can both work until one loses the status-comment
   claim.
@@ -269,6 +349,11 @@ Start with:
 8. [`app/sandbox/sandbox.ts`](../app/sandbox/sandbox.ts) — Sandbox lifecycle.
 9. [`app/changeset/index.ts`](../app/changeset/index.ts) — validated
    publishing.
+10. [`app/refactor/signals.ts`](../app/refactor/signals.ts) — when the gate
+    fires; [`app/workflows/refactor-gate/index.ts`](../app/workflows/refactor-gate/index.ts)
+    and [`app/workflows/refactor-apply/index.ts`](../app/workflows/refactor-apply/index.ts)
+    — the outer loop; [`skills/refactoring/`](../skills/refactoring/) — what
+    to change.
 
 Use the [extension runbook](runbooks/extend.md) to add agents, tasks, or
 triggers.

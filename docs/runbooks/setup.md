@@ -283,7 +283,9 @@ The command:
   `https://<gateway>.onrender.com/webhooks/github`;
 - preserves the generated webhook secret; and
 - creates `factory:triage`, `factory:spec-approved`,
-  `factory:pr-review`, `factory:autopilot`, and `factory:working`.
+  `factory:pr-review`, `factory:autopilot`, `factory:refactor-review`,
+  `factory:refactor-approved`, `factory:refactor-rejected`,
+  `factory:refactor-proposal`, and `factory:working`.
 
 It is safe to rerun. Continue only when it reports no failed repository or
 webhook operation.
@@ -425,6 +427,12 @@ It never approves or merges the pull request.
 Offer autopilot after the step-by-step run if the user chose that path first.
 Either path ends with a draft pull request the user can close and a branch
 they can delete.
+
+The outer loop needs no smoke test to complete setup. To try it, apply
+`factory:refactor-review` to any open pull request: the factory posts the
+refactoring skill's review as one comment. The refactor gate runs on its own
+after pushes to a base branch whose repository sets `refactor.sources`, and
+opens a proposal issue only when a problem forms.
 
 ## Troubleshooting setup
 

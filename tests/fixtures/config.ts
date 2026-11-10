@@ -14,7 +14,7 @@ export const REPOSITORY_CASES = [
 /** Unit tests never read the operator's deployment settings. Keep security-sensitive expectations explicit. */
 export const testConfig: FactoryConfig = {
 	repos: {
-		[REPO]: { baseBranch: "main", install: "npm ci", verify: [BUILD_COMMAND, TEST_COMMAND] },
+		[REPO]: { baseBranch: "main", install: "npm ci", verify: [BUILD_COMMAND, TEST_COMMAND], refactor: { sources: ["src"] } },
 		...Object.fromEntries(REPOSITORY_CASES.map(({ repo, baseBranch, verify }) => [repo, { baseBranch, verify: [...verify] }])),
 	},
 	labels: {
@@ -22,6 +22,10 @@ export const testConfig: FactoryConfig = {
 		specApproved: "factory:spec-approved",
 		prReview: "factory:pr-review",
 		autopilot: "factory:autopilot",
+		refactorReview: "factory:refactor-review",
+		refactorApproved: "factory:refactor-approved",
+		refactorRejected: "factory:refactor-rejected",
+		refactorProposal: "factory:refactor-proposal",
 	},
 	commandPrefix: "/factory",
 	minimumPermission: "write",

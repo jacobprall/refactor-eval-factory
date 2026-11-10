@@ -45,12 +45,45 @@ const ReviewMarker = z.object({
 	runId: z.string().min(1),
 });
 
-const SCHEMAS = { status: StatusMarker, spec: SpecMarker, questions: QuestionsMarker, review: ReviewMarker } as const;
+const Dollars = z.number().min(0).max(1_000_000);
+const Tokens = z.number().int().min(0);
+
+/** What the factory's agents spent on one change, so a report can price changes before and after a refactor. */
+const SpendMarker = z.object({
+	kind: z.enum(["feature", "refactor"]),
+	costUsd: Dollars,
+	tokens: z.object({ input: Tokens, output: Tokens, cacheRead: Tokens, cacheWrite: Tokens }),
+	/** For a refactor: what deciding on it cost (the gate's review), on top of `costUsd` for applying it. */
+	decisionUsd: Dollars.optional(),
+});
+
+/** On a refactor proposal issue: the finding the gate's review chose, at the commit it reviewed. */
+const ProposalMarker = z.object({
+	sha: z.string().regex(/^[0-9a-f]{40}$/),
+	fingerprint: z.string().min(1).max(300),
+	/** A RefactorFinding; validated where it is used. */
+	finding: z.unknown(),
+	/** The gate's brief, as the reviewer read it. */
+	brief: z.array(z.string().max(2000)).max(60),
+	reviewUsd: Dollars,
+});
+
+const SCHEMAS = {
+	status: StatusMarker,
+	spec: SpecMarker,
+	questions: QuestionsMarker,
+	review: ReviewMarker,
+	"refactor-review": ReviewMarker,
+	proposal: ProposalMarker,
+	spend: SpendMarker,
+} as const;
 
 export type MarkerKind = keyof typeof SCHEMAS;
 export type MarkerData = { [K in MarkerKind]: z.infer<(typeof SCHEMAS)[K]> };
 export type StatusMarker = MarkerData["status"];
 export type SpecMarker = MarkerData["spec"];
+export type SpendMarker = MarkerData["spend"];
+export type ProposalMarker = MarkerData["proposal"];
 
 /** GitHub caps a comment at 65,536 characters; the marker leaves room for the readable part. */
 const MAX_MARKER_CHARS = 48_000;

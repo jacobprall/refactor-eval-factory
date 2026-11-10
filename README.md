@@ -1,170 +1,72 @@
-# Refactor Eval Factory
+# A self-improving codebase
 
-Refactor Eval Factory measures whether an injected development procedure changes the cumulative cost of evolving software.
+Coding agents inherit the code left by previous runs. This repository runs two loops on Render: one turns issues into draft pull requests; the other keeps frequently changed code easier to change.
 
-The focused experiment runs three shared Claude Sonnet strategies against two multi-module codebases, plus a periodic comparator on the stateful inventory target. Each cell is a sequential trajectory: the agent receives ten requirements one at a time and inherits every prior edit. Future requirements and cumulative hidden tests remain unavailable to the model.
+The refactoring loop separates **when** to refactor from **what** to refactor:
 
-## Intervention arms
+- **When:** After a merge, a gate checks file change frequency, code health, and coupling. Hard-to-change code that is rarely touched is generally left alone.
+- **What:** When the gate fires, a refactoring skill reviews recent changes and proposes one refactor—or none.
+- **Safety:** A person approves the proposal. A separate agent records existing behavior, and the refactoring agent cannot see that recording. The factory opens a draft PR only if replay and verification pass.
 
-1. `baseline` — feature request only.
-2. `triggered-after` — one bounded refactor after at least six features, 200 production lines of accumulated churn, and a repeated hotspot, while at
-   least four future features remain.
-3. `evidence-seeking` — independently try direct and refactor-first implementations, then select by public correctness, production churn, and files touched.
-4. `periodic-after` — refactor after features 3, 6, and 9 on `inventory-reservations` only.
-5. `refactor-after-3`, `refactor-after-6`, and `refactor-after-9` — matched one-shot timing arms on the `usage-metering` positive control.
+Every factory PR records agent spending. Run `npm run cost-report` to compare the cost of changes before and after a refactor.
 
-All arms use `claude-sonnet-5` with the same implementer, tools, turn limit, feature sequence, and sandbox boundary. Evidence selection never sees hidden tests. Every candidate and refactor call is included in operational cost.
+Built on [software-factory](https://github.com/render-examples/software-factory), an extensible template for GitHub-native agent workflows on Render.
 
-## Runtime
+## Get started
 
-- Render Workflows fans out experiment cells and keeps each target's iterations in order.
-- One Render Sandbox owns each trajectory.
-- Target seeds are uploaded into an isolated working directory; the factory checkout is locked away before the agent runs.
-- Current-feature acceptance tests are visible before implementation. Cumulative hidden checks are uploaded only for scoring and removed before the next iteration.
-- Post-refactor verification rejects changes that remove exported runtime functions, class methods, or static methods before hidden scoring.
-- Postgres stores experiment, trajectory, iteration, model-usage, diff, and verification evidence. It may run locally or on Render.
+Deploy from a fork; `factory.config.ts` defines which repositories the factory can access.
 
-A default sweep is seven trajectories. The focused experiment uses five replicates for 35 trajectories. The separate positive-control matrix is 20
-trajectories: four arms at five replicates.
+1. Check the prerequisites in the [Quickstart](docs/quickstart.md).
+2. Ask a coding agent to follow the [Setup runbook](docs/runbooks/setup.md).
+3. Complete the GitHub, secrets, and paid-resource checkpoints when prompted.
 
-## Local verification
+The runbook configures and deploys the factory, connects its webhook, verifies its services, and runs a Triage smoke test.
 
-```bash
-npm ci
-npm run check
-```
+## Included workflows
 
-The test suite validates seed and reference codebases, asymmetric manifests, contract isolation, intervention timing, runner registration, change metrics,
-and report generation. CI never calls a live model.
+### Inner loop
 
-## Local evaluation loop
+- **Triage:** Reads an issue and repository, then asks questions, writes a specification, or declines.
+- **Spec-to-PR:** Implements an approved specification, runs verification, and opens a draft PR.
+- **PR Reviewer:** Runs verification and posts a non-approving review covering security, correctness, performance, and tests.
 
-The Workflows server, manifests, prompts, target codebases, orchestration, and Postgres run locally. Only Render Sandboxes and Sonnet remain remote. Evaluation Sandboxes restore a generic runner snapshot and never clone a GitHub repository.
+### Outer loop
 
-```bash
-cp .env.local.example .env.local
-# Fill in RENDER_API_KEY, RENDER_WORKSPACE_ID, and ANTHROPIC_API_KEY.
+- **Refactor gate:** Checks signals after pushes to the base branch and opens a proposal when warranted. Enable it per repository with `refactor.sources`.
+- **Refactor:** Apply `factory:refactor-approved` to execute an approved proposal behind the replay guard, or `factory:refactor-rejected` to discard it.
+- **Refactor Review:** Apply `factory:refactor-review` to a PR to post the skill’s review as a comment.
 
-docker compose up -d postgres
-npm run eval:migrate:local
-npm run dev:eval
-```
+GitHub holds the discussion and review; Render Workflows runs tasks; isolated Sandboxes run agents and tools. **The factory never approves or merges code.**
 
-In another terminal, start a small sweep:
+For upfront approval of the issue-to-review stages, apply `factory:autopilot`. If Triage needs clarification, the workflow pauses until a person replies.
 
-```bash
-npm run eval:local -- \
-  --targets inventory-reservations,notification-routing \
-  --scenarios evidence-seeking \
-  --max-concurrency 2
-```
+## Extend
 
-Source changes are picked up when the local Workflows server starts task subprocesses. Results persist in local Postgres even when the task server restarts.
+Add agents, harness adapters, Workflows tasks, or GitHub triggers. Configure repositories, commands, permissions, and limits in `factory.config.ts`, and models in `app/agents/models.ts`.
 
-The positive control starts from deliberately duplicated usage-policy paths and has a 12-feature payoff horizon. Run a two-arm sanity pilot before the
-full timing matrix:
+The factory provides event authentication, isolated execution, run coordination, typed outputs, and a publishing boundary. You provide the workflow logic, repository commands, permissions, models, budgets, and integrations.
 
-```bash
-npm run eval:local -- \
-  --targets usage-metering \
-  --scenarios baseline,refactor-after-6 \
-  --replicates 2 \
-  --max-concurrency 4
-```
+See the [extension runbook](docs/runbooks/extend.md).
 
-Proceed to `baseline,refactor-after-3,refactor-after-6,refactor-after-9` at five replicates only if the known-beneficial checkpoint lowers downstream
-correctness-gated churn without reducing hidden-test correctness.
+## Security and limits
 
-Preregistered manifests in `eval/manifest.ts` run by name. `positive-control-ladder` adds a replay guard, then measured health evidence, then a playbook
-to the feature-6 refactor, one factor per arm. `health-policy` compares the maturity trigger, the health gate, and the health safeguard against fresh
-concurrent baselines on three targets:
+- Model-directed code runs in Sandboxes; GitHub write credentials stay outside them.
+- Publishing validates targets and rejects unsafe or oversized changes. GitHub must reproduce the candidate tree SHA before publication.
+- Sandboxes allow all network egress, and the model key is in runner memory during a call. Review the [trust boundaries and residual risks](docs/architecture.md) before using private code or untrusted PRs.
+- Verification runs shell commands; browser testing is not included.
+- Timeouts and turn limits bound execution, but there is no hard dollar budget. Authorized users and enabled gates can start model spend.
+- The gate’s health score supports JavaScript and TypeScript. The refactoring skill can review any language.
+- Sandbox API calls count against the Render workspace’s request limit.
 
-`skill-review` lets the full refactoring skill (`eval/skills/talk-refactoring/`) review every feature as a pull request and decide whether to act:
+## Documentation
 
-```bash
-npm run eval:local -- --manifest positive-control-ladder
-npm run eval:local -- --manifest health-policy
-npm run eval:local -- --manifest skill-review
-npm run eval:local -- --manifest monolith
-npm run eval:local -- --manifest combined
-npm run eval:local -- --manifest coupling
-```
-
-`combined` gates one skill review behind the health or maturity trigger. `coupling` gates it behind files in different directories that keep
-changing together.
-
-`monolith` runs a six-module commerce monolith (`eval/targets/commerce/`) in three variants: planted cross-module debt with a backlog that keeps
-touching it, the same debt with a backlog that never does, and a clean seed with the first backlog.
-
-`series-2` tests the combined design: health, heat, and coupling (`app/eval/signals.ts`) decide when and where to look, and either a briefed
-refactorer (`signals-only`) or the full skill (`signals-skill`) decides what to change, against `baseline` and `skill-review` on five targets.
-Run `series-2-smoke` (four trajectories) first. The design, the gate's dry run on stored baselines, and the predictions are in
-[EVAL_FINDINGS.md](EVAL_FINDINGS.md#series-2-signals-decide-when-and-where-the-skill-decides-what).
-
-```bash
-npm run eval:local -- --manifest series-2-smoke
-npm run eval:local -- --manifest series-2
-```
-
-Relaunch an interrupted experiment with the same `--manifest` and `--experiment-id`; finished trajectories are kept.
-
-Every checkpoint records a structural-health snapshot of production code (`app/eval/health.ts`) and the three signals: health v2, heat, and
-coupling. Analyze stored experiments without model calls; checkpoints from before either was recorded are rebuilt from their stored patches:
-
-```bash
-npm run eval:analyze:local -- --experiments <id,id,...> [--target usage-metering] [--out analysis.md]
-```
-
-`npm run eval:compare-health:local -- --experiments <id,id,...>` compares the first health score with the two-axis model in
-`app/eval/health-v2.ts` on the same rebuilt checkpoints.
-
-The analysis reports interventions and hidden correctness per arm, break-even against per-feature baseline cost, health where the work is and
-coupling over time, structural health by arm, whether inherited health predicts the next feature's churn and correctness, and where each adaptive
-trigger would have fired on baseline trajectories.
-
-## Deploy
-
-1. Push this repository as `jacobprall/refactor-eval-factory`.
-2. Create the `refactor-eval-shared` group with `RENDER_API_KEY` and the `refactor-eval-workflows` group with `RENDER_WORKSPACE_ID` and
-   `ANTHROPIC_API_KEY` (use a spend-capped key).
-3. Apply the Blueprint. It creates the `refactor-eval-workflows` service and the `refactor-eval-results` database. Workflows have no pre-deploy
-   step, so each experiment applies the idempotent migrations before it writes. The first trajectory builds the generic runner snapshot; later
-   trajectories restore it.
-
-Start an experiment from your machine with `RENDER_API_KEY` and `RENDER_WORKFLOW_SLUG=refactor-eval-workflows` in `.env`:
-
-```bash
-npm run eval -- --manifest series-2-smoke
-npm run eval -- --manifest series-2
-```
-
-The command prints the Workflows task-run id and experiment id. Cells run through a pool of `maxConcurrency` trajectories, so one slow trajectory
-does not hold up the rest; the root run's 24-hour limit covers a full series, and a run that hits it resumes with `--experiment-id`. The
-`eval-summarize-experiment` task returns structured rows and Markdown comparing each scenario with the baseline for the same target. For the full
-analysis, point `DATABASE_URL` at the database's external connection string and run `npm run eval:analyze -- --experiments <id>`.
-
-## Primary outcome
-
-The primary outcome is correctness-gated production code churn required to complete an ordered backlog, interpreted together with:
-
-- production additions, deletions, modules touched, and repeated hotspots;
-- churn and module-touch slopes over feature order;
-- cumulative hidden-test correctness and regressions;
-- model turns, tokens, wall time, and USD as separate operational effort, including phases that failed or hit their turn limit;
-- structural health of the code each feature inherits;
-- final tree and per-iteration patch evidence.
-
-Files touched is evidence of change propagation, not a standalone quality score.
-
-## Safety and limits
-
-Model-directed code runs only inside disposable Sandboxes. Hidden tests and Postgres credentials never enter the agent working directory. The replay
-trace author sees only completed public requirements, and the refactorer never sees the replay script. The system records prompts by hash and bounded patches for reproducibility.
-
-One full live sweep incurs substantial model and Sandbox cost. Start with one target and two scenarios by supplying narrowed task input before launching the full matrix.
-
-The original GitHub issue-to-PR factory modules remain in the repository as reusable platform code but are outside the evaluation runtime path.
+- [Quickstart](docs/quickstart.md)
+- [Setup runbook](docs/runbooks/setup.md)
+- [Configuration](docs/configuration.md)
+- [Architecture](docs/architecture.md)
+- [Extension runbook](docs/runbooks/extend.md)
+- [Contributing](https://CONTRIBUTING.md)
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+[MIT](LICENSE).

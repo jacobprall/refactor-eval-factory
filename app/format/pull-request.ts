@@ -1,4 +1,5 @@
 import type { Implementation, Spec } from "../schemas/index.js";
+import { type Spend, spendLine } from "./spend.js";
 import { acceptanceChecklist } from "./spec.js";
 import { BODY_MAX_CHARS, bullets, codeSpan, fitAround, sanitize, sanitizeInline } from "./text.js";
 
@@ -25,6 +26,7 @@ export interface PullRequestBodyInput {
 	verification?: readonly VerifyResult[];
 	/** Link to the spec comment. */
 	specUrl?: string;
+	spend?: Spend;
 }
 
 /** The draft PR's body. The caller appends its hidden marker. */
@@ -44,10 +46,11 @@ export function pullRequestBody(input: PullRequestBodyInput): string {
 	if (implementation.followUps.length > 0) sections.push(`## Follow-ups\n\n${bullets(implementation.followUps)}`);
 
 	const links = input.specUrl ? `\n\n[Specification](${input.specUrl})` : "";
+	const spend = input.spend ? `${spendLine(input.spend)} ` : "";
 	return fitAround(
 		`Closes #${input.issue}.\n\n`,
 		sections.join("\n\n"),
-		`${links}\n\n---\n\n_Opened as a draft by the factory. Review it before marking it ready._`,
+		`${links}\n\n---\n\n_${spend}Opened as a draft by the factory. Review it before marking it ready._`,
 		BODY_MAX_CHARS,
 	);
 }
@@ -63,6 +66,6 @@ export function verificationTable(results: readonly VerifyResult[]): string {
 }
 
 /** Escapes characters that end a table cell. */
-function escapeCell(text: string): string {
+export function escapeCell(text: string): string {
 	return text.replaceAll("|", "\\|");
 }

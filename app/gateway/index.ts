@@ -54,15 +54,20 @@ export function createGateway(deps: GatewayDeps): Hono {
 			return c.json({ error: "invalid task input", task }, 422);
 		}
 
-		const { task, subject, idempotencyKey, input } = decision;
-		try {
-			const run = await deps.startTask(task, input, idempotencyKey);
-			return c.json({ runId: run.id, task }, 202);
-		} catch (error) {
-			warn("could not start task", { deliveryId, event, task, subject, error: error instanceof Error ? error.message : String(error) });
-			// A 5xx marks the delivery failed in GitHub, where it can be redelivered by hand.
-			return c.json({ error: "could not start task", task }, 502);
+		const { subject, also = [] } = decision;
+		const started: { runId: string; task: TaskName }[] = [];
+		for (const { task, input, idempotencyKey } of [decision, ...also]) {
+			try {
+				started.push({ runId: (await deps.startTask(task, input, idempotencyKey)).id, task });
+			} catch (error) {
+				warn("could not start task", { deliveryId, event, task, subject, error: error instanceof Error ? error.message : String(error) });
+				// A 5xx marks the delivery failed in GitHub, where it can be redelivered by hand. Idempotency keys keep a
+				// redelivery from starting the tasks that did start a second time.
+				return c.json({ error: "could not start task", task }, 502);
+			}
 		}
+		const [first, ...rest] = started;
+		return c.json({ ...first, ...(rest.length > 0 ? { also: rest } : {}) }, 202);
 	});
 
 	return app;

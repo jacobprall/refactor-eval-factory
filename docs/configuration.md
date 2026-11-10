@@ -16,6 +16,7 @@ export default defineFactoryConfig({
       baseBranch: "main",
       install: "npm ci",
       verify: ["npm run build", "npm test"],
+      refactor: { sources: ["src"] },
     },
     "acme/api": {
       baseBranch: "main",
@@ -28,6 +29,10 @@ export default defineFactoryConfig({
     specApproved: "factory:spec-approved",
     prReview: "factory:pr-review",
     autopilot: "factory:autopilot",
+    refactorReview: "factory:refactor-review",
+    refactorApproved: "factory:refactor-approved",
+    refactorRejected: "factory:refactor-rejected",
+    refactorProposal: "factory:refactor-proposal",
   },
   commandPrefix: "/factory",
   minimumPermission: "write",
@@ -52,10 +57,18 @@ from any other repository, even if the App is installed there.
 | `baseBranch` | Yes | Branch used for Triage, implementation, and snapshots |
 | `install` | No | Dependency command run after clone credentials are removed |
 | `verify` | Yes | Commands required before publishing and during PR review |
+| `refactor.sources` | No | Directories of production code the refactor gate measures; omit `refactor` to turn the gate off |
 
 Use deterministic install commands such as `npm ci`. Snapshot creation fails
 if installation changes a tracked file. Use `verify: []` only when you
 intentionally want no command-based verification.
+
+The refactor gate measures JavaScript and TypeScript files under
+`refactor.sources`, skipping tests, fixtures, and declaration files. It needs
+at least six commits on the base branch's first-parent history. Without
+`refactor`, pushes don't start the gate, but `factory:refactor-review` and
+approved proposals still work. Every refactor needs `verify` commands that
+cover the code it changes: they are the second check after the replay.
 
 After adding a repository:
 
@@ -73,6 +86,10 @@ After adding a repository:
 | `labels.specApproved` | `factory:spec-approved` | Starts Spec-to-PR |
 | `labels.prReview` | `factory:pr-review` | Starts PR Reviewer |
 | `labels.autopilot` | `factory:autopilot` | Runs all three stages through a reviewed draft PR |
+| `labels.refactorReview` | `factory:refactor-review` | Reviews a pull request with the refactoring skill |
+| `labels.refactorApproved` | `factory:refactor-approved` | Applies a refactor proposal and opens a draft PR |
+| `labels.refactorRejected` | `factory:refactor-rejected` | Drops a refactor proposal; its finding is never proposed again |
+| `labels.refactorProposal` | `factory:refactor-proposal` | Marks the issues the refactor gate opens; not a trigger |
 | `commandPrefix` | `/factory` | Prefix for commands such as `/factory cancel` |
 | `minimumPermission` | `write` | Live repository permission required to start work |
 | `limits.repairRounds` | `2` | Repair attempts after failed verification |
@@ -84,8 +101,8 @@ After adding a repository:
 factory checks the triggering actor's current permission at the start of
 every GitHub task.
 
-`setup:github` also creates `factory:working`. This label records an active
-run; it is not a trigger.
+`setup:github` also creates `factory:working` and `factory:refactor-proposal`.
+These labels record state; they are not triggers.
 
 If you rename a trigger label, deploy both services and rerun
 `npm run setup:github`. The command creates required labels but does not
@@ -143,6 +160,7 @@ The factory has no hard dollar budget.
 | Label, App permission, or subscribed event | Run `npm run setup:github`; update the App when prompted |
 | `app/runner/` or `app/harness/` sources | Deploy `factory-workflows`; each Sandbox gets the new runner payload when it opens |
 | `sandbox/` | Deploy `factory-workflows`, then refresh each repository snapshot |
+| `skills/refactoring/` | Deploy `factory-workflows`; each refactor task installs the skill when it opens a Sandbox |
 | Repository `install` command or lockfiles | Refresh the snapshot, or let the next task reinstall |
 
 ## Snapshots
@@ -221,6 +239,28 @@ labels. Triage may still clear a stale spec-approval label when it revises the
 spec. The trigger label is removed when a run starts. If Triage asks questions,
 the factory adds it back so a human reply can start the continuation. Use
 `/factory cancel` to stop an active root workflow.
+
+The refactor gate is not a GitHub task: it has no status comment, and its
+`run.finished` event records why it stayed closed, declined, or opened a
+proposal. Search for `refactor-gate` in the logs to follow it.
+
+## Price changes
+
+Draft pull requests from Spec-to-PR and refactors carry what their agents
+spent, in a line at the bottom and a hidden marker. A refactor's marker also
+records what deciding on it cost: the gate's review. To compare what changes
+to refactored code cost before and after each refactor:
+
+```bash
+npm run cost-report -- --repo <owner>/<name>
+```
+
+The report reads merged pull requests the App opened, with the App
+credentials in `.env`. For each merged refactor, it compares the factory's
+feature changes that touched the refactor's production files before and after
+it merged, and shows the break-even point and net savings. The two sides are
+different changes, so read a difference as evidence only when the changes are
+alike. Changes made outside the factory carry no marker and aren't counted.
 
 ## Check a deployment
 

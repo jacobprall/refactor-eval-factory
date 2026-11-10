@@ -58,6 +58,17 @@ export class GitHubClient {
 		return toIssue(await this.http.json<RawIssue>("GET", `${this.base}/issues/${number}`));
 	}
 
+	/** Issues (not pull requests) carrying `label`, newest first. */
+	async listIssuesWithLabel(label: string, state: "open" | "all"): Promise<Issue[]> {
+		const raw = await this.http.paginate<RawIssue>(`${this.base}/issues`, { query: { labels: label, state, sort: "created", direction: "desc" } });
+		return raw.map(toIssue).filter((issue) => !issue.isPull);
+	}
+
+	/** Not retried: a repeated POST would open a second issue. */
+	async createIssue(args: { title: string; body: string; labels: readonly string[] }): Promise<Issue> {
+		return toIssue(await this.http.json<RawIssue>("POST", `${this.base}/issues`, { body: { title: args.title, body: args.body, labels: args.labels } }));
+	}
+
 	/** Every comment, oldest first. */
 	async listIssueComments(number: number): Promise<IssueComment[]> {
 		return (await this.http.paginate<RawComment>(`${this.base}/issues/${number}/comments`)).map(toComment);

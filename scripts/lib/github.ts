@@ -183,6 +183,15 @@ class RepoClient {
 	async createLabel(label: { name: string; color: string; description: string }): Promise<void> {
 		await this.http.json("POST", `${this.base}/labels`, { body: label });
 	}
+
+	/** Closed pull requests, most recently updated first, up to `maxPages` pages of 100. */
+	closedPulls(maxPages = 10): Promise<unknown[]> {
+		return this.http.paginate(`${this.base}/pulls`, { query: { state: "closed", sort: "updated", direction: "desc" }, maxPages });
+	}
+
+	pullFiles(number: number): Promise<unknown[]> {
+		return this.http.paginate(`${this.base}/pulls/${number}/files`);
+	}
 }
 
 /** Splits "owner/name". */

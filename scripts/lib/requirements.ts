@@ -56,6 +56,25 @@ export const LABELS: readonly LabelSpec[] = [
 		description: "software-factory: run through a reviewed draft pull request",
 		trigger: true,
 	},
+	{
+		name: config.labels.refactorReview,
+		color: "bfd4f2",
+		description: "software-factory: review this pull request with the refactoring skill",
+		trigger: true,
+	},
+	{
+		name: config.labels.refactorApproved,
+		color: "0e8a16",
+		description: "software-factory: apply this refactor proposal and open a draft PR",
+		trigger: true,
+	},
+	{
+		name: config.labels.refactorRejected,
+		color: "e99695",
+		description: "software-factory: drop this refactor proposal; it won't be proposed again",
+		trigger: true,
+	},
+	{ name: config.labels.refactorProposal, color: "d4c5f9", description: "software-factory: a refactor the gate proposes", trigger: false },
 	{ name: WORKING_LABEL, color: "fbca04", description: "software-factory is working on this", trigger: false },
 ];
 
@@ -83,10 +102,10 @@ export interface EnvGroupSpec {
  * The gateway links no group that holds GitHub App credentials or a model key.
  */
 export const ENV_GROUPS: readonly EnvGroupSpec[] = [
-	{ name: "refactor-eval-shared", services: ["gateway", "workflows"], keys: ["RENDER_API_KEY"] },
-	{ name: "refactor-eval-gateway", services: ["gateway"], keys: ["GITHUB_WEBHOOK_SECRET"] },
+	{ name: "software-factory-shared", services: ["gateway", "workflows"], keys: ["RENDER_API_KEY"] },
+	{ name: "software-factory-gateway", services: ["gateway"], keys: ["GITHUB_WEBHOOK_SECRET"] },
 	{
-		name: "refactor-eval-workflows",
+		name: "software-factory-workflows",
 		services: ["workflows"],
 		keys: ["RENDER_WORKSPACE_ID", "GITHUB_APP_ID", "GITHUB_APP_PRIVATE_KEY", ...HARNESS_KEY_ENV],
 	},

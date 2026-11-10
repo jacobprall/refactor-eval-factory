@@ -1,17 +1,32 @@
 import { type ZodType, z } from "zod";
 import { config, resolveRepo, TASKS, type TaskName } from "../config/index.js";
-import { AutopilotInput, CancelInput, PrReviewInput, RefreshSnapshotInput, SpecToPrInput, TriageInput } from "../schemas/index.js";
+import {
+	AutopilotInput,
+	CancelInput,
+	PrReviewInput,
+	RefactorApplyInput,
+	RefactorGateInput,
+	RefactorReviewInput,
+	RefreshSnapshotInput,
+	SpecToPrInput,
+	TriageInput,
+} from "../schemas/index.js";
+
+export interface TaskStart {
+	task: TaskName;
+	/** Already validated with the task's input schema. */
+	input: object;
+	idempotencyKey: string;
+}
 
 export type Route =
-	| {
+	| (TaskStart & {
 			kind: "start";
-			task: TaskName;
-			/** Already validated with the task's input schema. */
-			input: object;
-			idempotencyKey: string;
 			/** "issue#12" or "pr#34", for the delivery event. */
 			subject?: string;
-	  }
+			/** Independent tasks the same delivery starts after the first. */
+			also?: TaskStart[];
+	  })
 	| { kind: "ignore"; reason: string }
 	/** An authenticated delivery that maps to a task but not to a valid input for it: a bug worth a failed delivery. */
 	| { kind: "invalid"; task: TaskName; reason: string; subject?: string };
@@ -104,6 +119,9 @@ export function route(event: string, payload: unknown, deliveryId: string): Rout
 			if (label?.name === config.labels.autopilot) {
 				return start(TASKS.autopilot, AutopilotInput, { issue: issue.number, actor }, subject);
 			}
+			if (label?.name === config.labels.refactorApproved) {
+				return start(TASKS.refactorApply, RefactorApplyInput, { issue: issue.number, actor }, subject);
+			}
 			return ignore("unhandled label");
 		}
 
@@ -112,9 +130,12 @@ export function route(event: string, payload: unknown, deliveryId: string): Rout
 			const parsed = PullRequestEvent.safeParse(payload);
 			if (!parsed.success) return ignore("malformed payload");
 			const { label, pull_request: pr } = parsed.data;
-			if (label?.name !== config.labels.prReview) return ignore("unhandled label");
+			const task =
+				label?.name === config.labels.prReview ? TASKS.prReview : label?.name === config.labels.refactorReview ? TASKS.refactorReview : undefined;
+			if (!task) return ignore("unhandled label");
 			if (pr.state !== "open") return ignore("pull request not open");
-			return start(TASKS.prReview, PrReviewInput, { pr: pr.number, headSha: pr.head.sha, actor }, `pr#${pr.number}`);
+			const schema = task === TASKS.prReview ? PrReviewInput : RefactorReviewInput;
+			return start(task, schema, { pr: pr.number, headSha: pr.head.sha, actor }, `pr#${pr.number}`);
 		}
 
 		case "issue_comment": {
@@ -143,7 +164,11 @@ export function route(event: string, payload: unknown, deliveryId: string): Rout
 			if (ref !== `refs/heads/${repo.config.baseBranch}`) return ignore("not base branch");
 			if (deleted) return ignore("branch deleted");
 			if (!SHA.test(after) || after === ZERO_SHA) return ignore("invalid sha");
-			return start(TASKS.refreshSnapshot, RefreshSnapshotInput, { sha: after }, undefined, `${repo.fullName}@${after}`);
+			const refresh = start(TASKS.refreshSnapshot, RefreshSnapshotInput, { sha: after }, undefined, `${repo.fullName}@${after}`);
+			if (refresh.kind !== "start" || !repo.config.refactor) return refresh;
+			const gate = start(TASKS.refactorGate, RefactorGateInput, { sha: after }, undefined, `${repo.fullName}@${after}:refactor-gate`);
+			if (gate.kind !== "start") return gate;
+			return { ...refresh, also: [{ task: gate.task, input: gate.input, idempotencyKey: gate.idempotencyKey }] };
 		}
 
 		default:

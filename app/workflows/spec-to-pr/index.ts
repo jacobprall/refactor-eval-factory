@@ -8,6 +8,7 @@ import { type OpenedSandbox, openSandbox, type SandboxRef, withSandbox } from ".
 import { type Implementation, SpecToPrInput } from "../../schemas/index.js";
 import { defineGitHubTask, type GitHubTaskDeps } from "../github-task.js";
 import { runVerify, type VerifyRun } from "../run-verify.js";
+import { addSpend, NO_SPEND, spendMarker } from "../spend.js";
 import { loadApprovedSpec } from "./approval.js";
 import { botIdentity, branchName, commitDate, commitMessage, ownedCommits, refusalSummary } from "./branch.js";
 import { implementMessage, mergeImplementation, repairMessage } from "./messages.js";
@@ -60,8 +61,12 @@ export const specToPrWorkflow = defineGitHubTask(
 		return withSandbox(open, async (sandbox) => {
 			await claim.trackSandbox(sandbox);
 			const baseSha = sandbox.headSha;
-			const implement = async (message: string): Promise<Implementation> =>
-				(await (deps.runAgent ?? runAgent)(implementer, message, { ...claim.agentRunOptions(sandbox), timeoutMs: IMPLEMENT_TIMEOUT_MS })).output;
+			let spend = NO_SPEND;
+			const implement = async (message: string): Promise<Implementation> => {
+				const run = await (deps.runAgent ?? runAgent)(implementer, message, { ...claim.agentRunOptions(sandbox), timeoutMs: IMPLEMENT_TIMEOUT_MS });
+				spend = addSpend(spend, run);
+				return run.output;
+			};
 
 			const owned = await ownedCommits(git, branch, baseSha, author);
 
@@ -103,7 +108,7 @@ export const specToPrWorkflow = defineGitHubTask(
 				head: branch,
 				base: repo.config.baseBranch,
 				title: pullRequestTitle(spec),
-				body: pullRequestBody({ issue: input.issue, spec, implementation, verification, specUrl: comment.htmlUrl }),
+				body: `${pullRequestBody({ issue: input.issue, spec, implementation, verification, specUrl: comment.htmlUrl, spend })}\n\n${spendMarker("feature", spend)}`,
 				draft: true,
 			});
 			return {

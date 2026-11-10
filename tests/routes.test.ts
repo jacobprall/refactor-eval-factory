@@ -124,13 +124,36 @@ describe("route: starts", () => {
 		expect(route("push", { ...payload, ref: "refs/heads/main" }, DELIVERY).kind).toBe("ignore");
 	});
 
-	it("push to the base branch starts refresh-snapshot keyed by repo@sha", () => {
+	it("push to the base branch starts refresh-snapshot and, where it is on, the refactor gate, each keyed by repo@sha", () => {
 		const r = route("push", push(), DELIVERY);
 		expect(r).toEqual({
 			kind: "start",
 			task: "refresh-snapshot",
 			input: { repo: REPO, installationId: 7, sha: SHA },
 			idempotencyKey: `${REPO}@${SHA}`,
+			also: [{ task: "refactor-gate", input: { repo: REPO, installationId: 7, sha: SHA }, idempotencyKey: `${REPO}@${SHA}:refactor-gate` }],
+		});
+	});
+
+	it("refactor-approved label on an issue starts refactor-apply", () => {
+		const r = route("issues", issueLabeled(config.labels.refactorApproved), DELIVERY);
+		expect(r).toEqual({
+			kind: "start",
+			task: "refactor-apply",
+			input: { repo: REPO, installationId: 7, issue: 12, actor: "maintainer" },
+			idempotencyKey: DELIVERY,
+			subject: "issue#12",
+		});
+	});
+
+	it("refactor-review label on an open PR starts refactor-review", () => {
+		const r = route("pull_request", prLabeled(config.labels.refactorReview), DELIVERY);
+		expect(r).toEqual({
+			kind: "start",
+			task: "refactor-review",
+			input: { repo: REPO, installationId: 7, pr: 34, headSha: SHA, actor: "maintainer" },
+			idempotencyKey: DELIVERY,
+			subject: "pr#34",
 		});
 	});
 });
@@ -141,6 +164,9 @@ describe("route: ignores untrusted or irrelevant deliveries", () => {
 			["issues", { ...issueLabeled(config.labels.triage), sender: { login: "factory[bot]", type: "Bot" } }],
 			["issues", { ...issueLabeled(config.labels.triage), repository: { full_name: "someone/else" } }],
 			["pull_request", prLabeled(config.labels.prReview, "closed")],
+			["pull_request", prLabeled(config.labels.refactorReview, "closed")],
+			// The gate opens proposals and Workflows applies labels; a bot's approval must never start a refactor.
+			["issues", { ...issueLabeled(config.labels.refactorApproved), sender: { login: "factory[bot]", type: "Bot" } }],
 			["push", push({ ref: "refs/heads/feature" })],
 		];
 		for (const [event, payload] of deliveries) expect(route(event, payload, DELIVERY).kind).toBe("ignore");

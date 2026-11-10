@@ -5,12 +5,30 @@ export interface RepoConfig {
 	install?: string;
 	/** Commands that must pass before a PR opens and that PR Reviewer runs. */
 	verify: string[];
+	/** Turns on the refactor gate, which reads the signals after every push to the base branch. Omit to leave it off. */
+	refactor?: {
+		/** Directories of production code the signals measure: TypeScript and JavaScript files, tests excluded. */
+		sources: string[];
+	};
 }
 
 export interface FactoryConfig {
 	/** Repositories the factory acts on, keyed by "owner/name". Webhooks from any other repository are ignored. */
 	repos: Record<string, RepoConfig>;
-	labels: { triage: string; specApproved: string; prReview: string; autopilot: string };
+	labels: {
+		triage: string;
+		specApproved: string;
+		prReview: string;
+		autopilot: string;
+		/** On a pull request: review it with the refactoring skill and post one comment. */
+		refactorReview: string;
+		/** On a refactor proposal: apply it and open a draft PR. */
+		refactorApproved: string;
+		/** On a refactor proposal: the finding is not wanted, and the skill won't propose it again. */
+		refactorRejected: string;
+		/** Marks the issues the refactor gate opens. */
+		refactorProposal: string;
+	};
 	/** Prefix for comment commands, such as `/factory cancel`. */
 	commandPrefix: string;
 	/** GitHub permission the triggering actor needs on the repository. */
@@ -39,6 +57,7 @@ export default defineFactoryConfig({
 			baseBranch: "main",
 			install: "npm ci",
 			verify: ["npm run check"],
+			refactor: { sources: ["app", "scripts"] },
 		},
 		"jacobprall/render-mcp-server": {
 			baseBranch: "main",
@@ -63,6 +82,10 @@ export default defineFactoryConfig({
 		specApproved: "factory:spec-approved",
 		prReview: "factory:pr-review",
 		autopilot: "factory:autopilot",
+		refactorReview: "factory:refactor-review",
+		refactorApproved: "factory:refactor-approved",
+		refactorRejected: "factory:refactor-rejected",
+		refactorProposal: "factory:refactor-proposal",
 	},
 	commandPrefix: "/factory",
 	minimumPermission: "write",
